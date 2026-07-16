@@ -1,0 +1,2424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TextPlot</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; padding:0; background:#000; overflow:hidden;
+    font-family:'DM Mono', monospace; }
+  canvas { display:block; }
+
+  /* ---------- begin overlay (user gesture for mic) ---------- */
+  #beginOverlay { position:fixed; inset:0; background:#000; z-index:50;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#ccc; text-align:center; }
+  #beginOverlay h1 { font-weight:500; font-size:22px; letter-spacing:0.3em;
+    margin:0 0 14px; color:#fff; }
+  #beginOverlay h1 span { color:#777; }
+  #beginOverlay p { font-size:11.5px; color:#888; max-width:440px; line-height:1.8;
+    margin:4px 0; letter-spacing:0.04em; }
+  .beginRow { display:flex; gap:18px; margin-top:34px; }
+  .beginChoice { display:flex; flex-direction:column; align-items:center; }
+  .beginChoice button { padding:12px 26px; font-family:'DM Mono',monospace;
+    font-size:12px; letter-spacing:0.16em; background:transparent; color:#ddd;
+    border:1px solid rgba(255,255,255,0.4); cursor:pointer;
+    transition:background .3s, color .3s; }
+  .beginChoice button:hover { background:rgba(255,255,255,0.15); color:#fff; }
+  .beginChoice p { font-size:10px !important; color:#666 !important; line-height:1.7 !important;
+    margin-top:10px !important; }
+  @media (max-width:560px) { .beginRow { flex-direction:column; gap:22px; } }
+  #beginCredit { margin-top:44px !important; font-size:10px !important;
+    color:#555 !important; letter-spacing:0.1em; }
+  #beginCredit a { color:#888; text-decoration:none;
+    border-bottom:1px solid rgba(255,255,255,0.25); }
+  #beginCredit a:hover { color:#fff; }
+
+  /* ---------- mode tabs ---------- */
+  #modeTabs { display:flex; margin:14px 0 4px; border:1px solid rgba(255,255,255,0.25); }
+  #modeTabs button { flex:1; padding:8px 0; background:transparent; color:#888; border:none;
+    font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.16em;
+    text-transform:uppercase; cursor:pointer; transition:background .25s, color .25s; }
+  #modeTabs button + button { border-left:1px solid rgba(255,255,255,0.25); }
+  #modeTabs button.active { background:rgba(255,255,255,0.15); color:#fff; }
+
+  /* ---------- logo ---------- */
+  #logo { position:fixed; top:16px; left:16px; z-index:15;
+    font-family:'DM Mono', monospace; font-size:13px; letter-spacing:0.18em;
+    color:#fff; pointer-events:none; user-select:none; }
+  #logo span { color:#777; }
+
+  /* ---------- settings panel ---------- */
+  #panel { position:fixed; top:0; left:0; height:100%; width:290px; box-sizing:border-box;
+    background:rgba(0,0,0,0.88); border-right:1px solid rgba(255,255,255,0.15);
+    padding:52px 16px 44px; z-index:40; overflow-y:auto;
+    transform:translateX(-100%); transition:transform .35s ease;
+    color:#bbb; font-size:11px; letter-spacing:0.04em; }
+  #panel.open { transform:translateX(0); }
+  #panel h2 { font-weight:500; font-size:12px; letter-spacing:0.2em; color:#fff; margin:0 0 4px; }
+  #panel .hint { color:#555; font-size:10px; line-height:1.6; margin:6px 0 14px; }
+  #panel .subhint { color:#555; font-size:10px; line-height:1.6; margin:4px 0 0; }
+  #panel label { display:block; margin:12px 0 4px; font-size:10px;
+    letter-spacing:0.12em; text-transform:uppercase; color:#888; }
+  #panel select, #panel input[type="text"] { width:100%; box-sizing:border-box;
+    background:transparent; color:#ddd; border:1px solid rgba(255,255,255,0.2);
+    padding:6px 8px; font-family:'DM Mono',monospace; font-size:11px; }
+  #panel select option { background:#111; color:#ddd; }
+  #panel input[type="range"] { width:100%; accent-color:#888; }
+  #panel textarea { width:100%; box-sizing:border-box; background:transparent; color:#ddd;
+    border:1px solid rgba(255,255,255,0.2); padding:6px 8px; resize:vertical;
+    font-family:'DM Mono',monospace; font-size:11px; line-height:1.5; }
+  #recBtn.rec { border-color:rgba(200,90,90,0.9); color:#e8a0a0;
+    background:rgba(120,30,30,0.35); }
+  #panel input[type="color"] { width:100%; height:28px; background:transparent;
+    border:1px solid rgba(255,255,255,0.2); padding:2px; cursor:pointer; }
+  #panel .val { color:#666; font-size:10px; float:right; }
+  #panel button { padding:8px; background:transparent; width:100%;
+    color:#ccc; border:1px solid rgba(255,255,255,0.25); font-family:'DM Mono',monospace;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;
+    transition:background .3s; }
+  #panel button:hover { background:rgba(255,255,255,0.12); }
+  #panel .section { margin-top:20px; padding-top:12px;
+    border-top:1px solid rgba(255,255,255,0.12); }
+  #panel .section-title { font-size:10px; letter-spacing:0.2em; color:#666;
+    text-transform:uppercase; }
+  #resetBtn { margin-top:22px; }
+  .hidden { display:none !important; }
+
+  /* ---------- about ---------- */
+  #aboutBtn { position:fixed; top:14px; right:16px; z-index:55;
+    width:30px; height:30px; border-radius:50%; padding:0; cursor:pointer;
+    border:1px solid rgba(255,255,255,0.4); color:#ddd; background:rgba(0,0,0,0.6);
+    font-family:'DM Mono',monospace; font-size:14px; }
+  #aboutBtn:hover { background:rgba(255,255,255,0.15); }
+  #aboutPop { display:none; position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%); width:min(460px, 86vw); max-height:76vh;
+    overflow-y:auto; background:#000; border:1px solid rgba(255,255,255,0.3);
+    z-index:60; padding:22px; font-family:'DM Mono',monospace; color:#ddd;
+    font-size:11.5px; line-height:1.75; box-shadow:0 0 60px rgba(0,0,0,0.9); }
+  #aboutPop h3 { margin:0 0 12px 0; font-size:12px; letter-spacing:0.2em;
+    font-weight:500; color:#fff; }
+  #aboutPop .txt { white-space:pre-wrap; }
+  #aboutPop .btnrow { margin-top:14px; }
+  #aboutPop button { padding:7px 14px; background:transparent; color:#ccc; cursor:pointer;
+    border:1px solid rgba(255,255,255,0.25); font-family:'DM Mono',monospace;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; }
+  #aboutPop button:hover { background:rgba(255,255,255,0.12); }
+  #aboutPop a, #footerCredit a { color:#aaa; text-decoration:none;
+    border-bottom:1px solid rgba(255,255,255,0.25); }
+  #aboutPop a:hover, #footerCredit a:hover { color:#fff; }
+
+  /* ---------- canvas buttons ---------- */
+  #canvasBtns { position:fixed; right:14px; bottom:64px; z-index:12;
+    display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  #canvasBtns button { padding:6px 10px; background:rgba(0,0,0,0.6); color:#ccc;
+    border:1px solid rgba(255,255,255,0.3); font-family:'DM Mono',monospace;
+    font-size:10px; letter-spacing:0.1em; cursor:pointer; }
+  #canvasBtns button:hover { background:rgba(255,255,255,0.15); }
+
+  /* ---------- footer credit ---------- */
+  #footerCredit { position:fixed; bottom:8px; right:14px; z-index:12;
+    font-family:'DM Mono',monospace; font-size:10px; color:rgba(255,255,255,0.45);
+    letter-spacing:0.08em; }
+
+  /* ---------- cue editor drawer ---------- */
+  #cueDrawer { position:fixed; top:0; right:0; height:100%; width:320px; box-sizing:border-box;
+    background:rgba(0,0,0,0.9); border-left:1px solid rgba(255,255,255,0.15);
+    padding:52px 16px 44px; z-index:38; overflow-y:auto;
+    transform:translateX(100%); transition:transform .35s ease;
+    color:#bbb; font-size:11px; letter-spacing:0.04em; }
+  #cueDrawer.open { transform:translateX(0); }
+  #cueDrawer h2 { font-weight:500; font-size:12px; letter-spacing:0.2em; color:#fff; margin:0 0 8px; }
+  #cueTools { position:sticky; top:-52px; margin:-52px -16px 10px; padding:52px 16px 10px;
+    background:rgba(0,0,0,0.96); border-bottom:1px solid rgba(255,255,255,0.12); z-index:2; }
+  #cueDrawer .hint { color:#555; font-size:10px; line-height:1.6; margin:6px 0 14px; }
+  .cue { border:1px solid rgba(255,255,255,0.15); margin-bottom:8px; padding:7px 8px;
+    transition:border-color .3s; }
+  .cue.active { border-color:rgba(122,157,122,0.8); }
+  .cue .cueHead { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .cue .num { font-size:10px; letter-spacing:0.12em; color:#777; cursor:pointer;
+    border-bottom:1px dotted rgba(255,255,255,0.25); }
+  .cue .num:hover { color:#fff; }
+  .cue.active .num { color:#9dbb9d; }
+  .cue .del { background:transparent; border:none; color:#555; cursor:pointer;
+    font-family:'DM Mono',monospace; font-size:12px; padding:0 3px; }
+  .cue .del:hover { color:#fff; }
+  .cue textarea { width:100%; box-sizing:border-box; background:transparent; color:#ddd;
+    border:none; resize:vertical; min-height:38px; font-family:'DM Mono',monospace;
+    font-size:11px; line-height:1.5; outline:none; }
+  #cueDrawer .row { display:flex; gap:8px; }
+  #cueDrawer .row button { flex:1; padding:8px; background:transparent;
+    color:#ccc; border:1px solid rgba(255,255,255,0.25); font-family:'DM Mono',monospace;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; }
+  #cueDrawer .row button:hover { background:rgba(255,255,255,0.12); }
+  #cueDrawer .row button.active { background:rgba(122,157,122,0.25); color:#cfe8cf;
+    border-color:rgba(122,157,122,0.7); }
+  .cue .char { font-size:9px; letter-spacing:0.1em; color:#8aa4c4; margin-left:8px; }
+  .charRow { border:1px solid rgba(255,255,255,0.15); padding:7px 8px; margin-top:8px; }
+  .charRow .row { margin-top:6px; }
+  .charRow input[type="text"] { width:100%; box-sizing:border-box; background:transparent;
+    color:#ddd; border:1px solid rgba(255,255,255,0.2); padding:5px 7px;
+    font-family:'DM Mono',monospace; font-size:11px; }
+  .charRow select { flex:2; }
+  .charRow input[type="color"] { flex:1; height:26px; background:transparent;
+    border:1px solid rgba(255,255,255,0.2); padding:2px; cursor:pointer; }
+  .charRow .del { background:transparent; border:none; color:#555; cursor:pointer;
+    font-family:'DM Mono',monospace; font-size:12px; float:right; padding:0 3px; }
+  .charRow .del:hover { color:#fff; }
+  #addCueBtn { padding:8px; background:transparent; width:100%;
+    color:#ccc; border:1px solid rgba(255,255,255,0.25); font-family:'DM Mono',monospace;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer; }
+  #addCueBtn:hover { background:rgba(255,255,255,0.12); }
+
+  /* ---------- status ---------- */
+  #status { position:fixed; bottom:14px; left:18px; z-index:30;
+    color:#555; font-size:10px; letter-spacing:0.08em;
+    display:flex; align-items:center; gap:8px; max-width:55vw; }
+  #statusDot { width:7px; height:7px; border-radius:50%; background:#333;
+    flex:none; transition:background .4s; }
+  #statusDot.live { background:#7a9d7a; box-shadow:0 0 8px rgba(122,157,122,0.6); }
+
+  /* ---------- whisper model download indicator ---------- */
+  #dl { position:fixed; top:56px; right:16px; z-index:14; width:220px;
+    background:rgba(0,0,0,0.85); border:1px solid rgba(255,255,255,0.25);
+    padding:11px 13px; color:#bbb; font-size:10px; letter-spacing:0.08em;
+    font-family:'DM Mono',monospace;
+    opacity:0; transition:opacity .4s; pointer-events:none; }
+  #dl.show { opacity:1; }
+  #dl.ready { border-color:rgba(122,157,122,0.6); color:#9dbb9d; }
+  #dlBar { margin-top:8px; height:3px; background:rgba(255,255,255,0.12); }
+  #dlFill { height:100%; width:0%; background:#8a8a8a; transition:width .3s; }
+  #dl.ready #dlFill { background:#7a9d7a; }
+
+  @media (max-width: 640px) {
+    #panel { width:min(280px, 86vw); padding:48px 12px 42px 12px; }
+    #logo { font-size:11px; top:12px; left:12px; letter-spacing:0.14em; }
+    #aboutBtn { top:12px; right:12px; width:26px; height:26px; font-size:12px; }
+    #canvasBtns { right:10px; bottom:56px; gap:5px; }
+    #canvasBtns button { font-size:9px; padding:5px 8px; }
+    #footerCredit { font-size:8px; right:10px; bottom:6px; }
+    #dl { width:180px; top:48px; right:12px; }
+  }
+</style>
+</head>
+<body>
+
+
+
+<div id="logo">TEXT<span>PLOT</span></div>
+<button id="aboutBtn" title="about / how to use">?</button>
+<div id="aboutPop"></div>
+
+<div id="beginOverlay">
+  <h1>TEXT<span>PLOT</span></h1>
+  <p>transcribe speech live, animate typed text, or run manual subtitles from an edited script.</p>
+  <div class="beginRow">
+    <div class="beginChoice">
+      <button id="beginLiveBtn">live transcription</button>
+      <p>the mic listens and text appears<br>as it is spoken. floating or subtitles.</p>
+    </div>
+    <div class="beginChoice">
+      <button id="beginAnimBtn">text animation</button>
+      <p>paste any text and watch it play<br>out word by word, styled like the live mode.</p>
+    </div>
+    <div class="beginChoice">
+      <button id="beginManualBtn">manual subtitles</button>
+      <p>upload a script, edit the cues,<br>trigger each one with the arrow keys.</p>
+    </div>
+  </div>
+  <p id="beginCredit">made by <a href="https://gauravnijjer.com" target="_blank" rel="noopener">gaurav singh nijjer</a></p>
+</div>
+
+<div id="canvasBtns">
+  <button id="settingsBtn" title="open settings (or press S)">settings</button>
+  <button id="cuesBtn" class="hidden" title="open the cue editor (or press C)">cues</button>
+  <button id="recBtn" title="record the canvas to a video file">record</button>
+</div>
+<input type="file" id="scriptFile" accept=".txt,.md,.pdf" style="display:none">
+<div id="footerCredit"></div>
+
+<div id="cueDrawer">
+  <div id="cueTools">
+    <h2>CUES</h2>
+    <div class="row" style="margin-bottom:8px;">
+      <button id="showCueBtn">show</button>
+      <button id="hideCueBtn">hide</button>
+    </div>
+    <div class="row">
+      <button id="exportCuesBtn" title="save the cue list as a JSON file">export cues</button>
+      <button id="loadCuesBtn" title="load a previously exported cue file">load cues</button>
+    </div>
+  </div>
+  <p class="hint">up / down arrows step through cues while performing.<br>
+  click a cue number to jump straight to it. text is editable.</p>
+  <div id="cueList"></div>
+  <button id="addCueBtn">+ add cue</button>
+</div>
+<input type="file" id="cuesFile" accept=".json" style="display:none">
+
+<div id="panel">
+  <h2>SETTINGS</h2>
+  <p class="hint">press S to open or close. changes apply live.</p>
+
+  <div id="modeTabs">
+    <button id="tabLive">live</button>
+    <button id="tabAnim">text</button>
+    <button id="tabManual">manual</button>
+  </div>
+  <p class="hint" id="tabHint"></p>
+
+  <!-- ================= LIVE + TEXT (shared) ================= -->
+  <div class="sec-spawn">
+    <div class="section-title">Display</div>
+    <label>Layout</label>
+    <select id="modeSel">
+      <option value="floating">Floating apparitions</option>
+      <option value="subtitles">Subtitles (organised)</option>
+    </select>
+    <p class="subhint" id="modeHint"></p>
+
+    <label>Words per apparition <span class="val" id="clusterVal"></span></label>
+    <input type="range" id="clusterSel" min="1" max="6" step="1">
+  </div>
+
+  <!-- ================= TEXT ANIMATION ================= -->
+  <div class="section sec-anim">
+    <div class="section-title">Source text</div>
+
+    <label>Text</label>
+    <textarea id="animText" rows="7" placeholder="paste or type the text to animate…"></textarea>
+
+    <label>Pace (words / second) <span class="val" id="animPaceVal"></span></label>
+    <input type="range" id="animPaceSel" min="0.3" max="6" step="0.1">
+
+    <label>Loop</label>
+    <select id="animLoopSel">
+      <option value="off">Play once</option>
+      <option value="on">Loop forever</option>
+    </select>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="animPlayBtn">play</button>
+      <button id="animRestartBtn">restart</button>
+    </div>
+    <p class="subhint" id="animInfo"></p>
+  </div>
+
+  <div class="section sec-live">
+    <div class="section-title">Recognition</div>
+
+    <label>Engine</label>
+    <select id="engineSel">
+      <option value="webspeech">Web Speech (online, instant)</option>
+      <option value="whisper-browser">Whisper in browser (offline after download)</option>
+      <option value="whisper-server">Whisper local server</option>
+    </select>
+
+    <label>Language</label>
+    <select id="langSel">
+      <option value="auto">Auto-detect (Whisper only)</option>
+      <option value="en-IN">English (India)</option>
+      <option value="en-US">English (US)</option>
+      <option value="hi-IN">Hindi</option>
+      <option value="bn-IN">Bengali</option>
+      <option value="ta-IN">Tamil</option>
+      <option value="te-IN">Telugu</option>
+      <option value="mr-IN">Marathi</option>
+      <option value="gu-IN">Gujarati</option>
+      <option value="kn-IN">Kannada</option>
+      <option value="ml-IN">Malayalam</option>
+      <option value="pa-IN">Punjabi</option>
+      <option value="ur-IN">Urdu</option>
+    </select>
+
+    <div id="whisperModelWrap" class="hidden">
+      <label>Whisper model</label>
+      <select id="modelSel">
+        <option value="onnx-community/whisper-tiny">Tiny (fastest, ~40 MB)</option>
+        <option value="onnx-community/whisper-base">Base (balanced, ~80 MB)</option>
+        <option value="onnx-community/whisper-small">Small (best, ~250 MB)</option>
+      </select>
+      <p class="subhint">downloads once, then cached for offline use.</p>
+    </div>
+
+    <div id="serverWrap" class="hidden">
+      <label>Server URL</label>
+      <input type="text" id="serverUrl">
+      <p class="subhint">point at a running whisper.cpp server (./server -m model.bin) or compatible endpoint. response should contain a "text" field.</p>
+    </div>
+
+  </div>
+
+  <div class="section sec-live">
+    <div class="section-title">Translation</div>
+
+    <label>Translate</label>
+    <select id="translateSel">
+      <option value="off">Off</option>
+      <option value="mymemory">Online (MyMemory, any target)</option>
+      <option value="whisper-en">Whisper → English (offline)</option>
+    </select>
+    <p class="subhint" id="translateHint"></p>
+
+    <div id="targetWrap" class="hidden">
+      <label>Translate into</label>
+      <select id="targetSel">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="bn">Bengali</option>
+        <option value="ta">Tamil</option>
+        <option value="te">Telugu</option>
+        <option value="mr">Marathi</option>
+        <option value="gu">Gujarati</option>
+        <option value="kn">Kannada</option>
+        <option value="ml">Malayalam</option>
+        <option value="pa">Punjabi</option>
+        <option value="ur">Urdu</option>
+      </select>
+
+      <label>Show</label>
+      <select id="tDisplaySel">
+        <option value="both">Original with translation beneath</option>
+        <option value="translated">Translation only</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ================= SCRIPT (manual mode) ================= -->
+  <div class="section sec-manual">
+    <div class="section-title">Script</div>
+    <button id="scriptBtn" style="margin-top:10px;">upload script (.txt / .pdf)</button>
+    <p class="subhint" id="scriptInfo">no script loaded</p>
+    <p class="subhint">the script is auto-split into cues. the cue editor (bottom right, or press C) holds them for editing — ↑ ↓ arrows trigger each one.</p>
+
+    <label>Import</label>
+    <select id="importSel">
+      <option value="dialogues">Dialogues only (strip names &amp; directions)</option>
+      <option value="full">Full text as written</option>
+    </select>
+    <p class="subhint">dialogues-only follows stage-script layout: speaker names on their own line, directions as plain paragraphs. if no structure is found, the full text is used.</p>
+
+    <label>Max words per cue <span class="val" id="cueWordsVal"></span></label>
+    <input type="range" id="cueWordsSel" min="2" max="20" step="1">
+    <button id="recalcBtn" style="margin-top:8px;">recalculate cues</button>
+    <p class="subhint">re-splits the uploaded script with the setting above. hand edits to the cue list are replaced.</p>
+
+    <div class="row" style="margin-top:8px;">
+      <button id="cueEditBtn">open cue editor</button>
+      <button id="clearScriptBtn">clear script</button>
+    </div>
+  </div>
+
+  <div class="section sec-manual">
+    <div class="section-title">Translation</div>
+
+    <label>Translate cues</label>
+    <select id="cueTransSel">
+      <option value="off">Off</option>
+      <option value="on">On — machine translation (online)</option>
+    </select>
+
+    <div id="cueTransWrap" class="hidden">
+      <label>Translate into</label>
+      <select id="cueTargetSel">
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="bn">Bengali</option>
+        <option value="ta">Tamil</option>
+        <option value="te">Telugu</option>
+        <option value="mr">Marathi</option>
+        <option value="gu">Gujarati</option>
+        <option value="kn">Kannada</option>
+        <option value="ml">Malayalam</option>
+        <option value="pa">Punjabi</option>
+        <option value="ur">Urdu</option>
+      </select>
+
+      <label>Show</label>
+      <select id="cueTDisplaySel">
+        <option value="original">Original only</option>
+        <option value="translated">Translation only</option>
+        <option value="both-one">Both together — one box, one projector</option>
+        <option value="both-two">Both split — two boxes, two projectors</option>
+      </select>
+      <p class="subhint">two-box mode places the original in the upper half and the translation in the lower half, so two crops can feed two screens. the safe-area box outlines each.</p>
+
+      <button id="transAllBtn" style="margin-top:8px;">translate all cues now</button>
+      <p class="subhint">upcoming cues translate themselves a few ahead as you step. translate-all prepares the whole show beforehand — do it once on venue wifi, then export cues to keep the translations.</p>
+    </div>
+  </div>
+
+  <div class="section sec-manual">
+    <div class="section-title">Characters</div>
+    <p class="subhint">speaker names detected as NAME: at the start of lines. each character's text can carry its own style and colour. names found in the script appear here automatically.</p>
+    <div id="charList"></div>
+    <button id="addCharBtn" style="margin-top:8px;">+ add character</button>
+
+    <label>Show character names</label>
+    <select id="namesSel">
+      <option value="off">Hidden — text only</option>
+      <option value="on">Shown before each cue</option>
+    </select>
+  </div>
+
+  <!-- ================= SHARED LOOK ================= -->
+  <div class="section">
+    <div class="section-title">Canvas</div>
+
+    <label>Canvas colour</label>
+    <input type="color" id="bgSel">
+
+    <div class="sec-manual">
+      <label>Safe-area box</label>
+      <select id="safeSel">
+        <option value="off">Off</option>
+        <option value="on">On — outline the largest cue</option>
+      </select>
+      <p class="subhint">draws the maximum extent of the current cue list, so the crop in OBS or Isadora can be set once and every cue stays inside it. measure with the menus closed, then switch off for the show.</p>
+    </div>
+
+    <div class="sec-spawn">
+      <label>Trails <span class="val" id="trailsVal"></span></label>
+      <input type="range" id="trailsSel" min="0" max="0.97" step="0.01">
+    </div>
+
+    <div class="sec-live">
+      <label>Silence darkening <span class="val" id="dimVal"></span></label>
+      <input type="range" id="dimSel" min="0" max="1" step="0.05">
+      <p class="subhint">the canvas slowly darkens when no one speaks.</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Text</div>
+
+    <label>Font</label>
+    <select id="fontSel">
+      <option value="Georgia, serif">Georgia</option>
+      <option value="'Times New Roman', serif">Times</option>
+      <option value="'DM Mono', monospace">DM Mono</option>
+      <option value="'Courier New', monospace">Courier</option>
+      <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+      <option value="'Palatino Linotype', Palatino, serif">Palatino</option>
+    </select>
+
+    <label>Text colour</label>
+    <input type="color" id="colorSel">
+
+    <label>Base size <span class="val" id="sizeVal"></span></label>
+    <input type="range" id="sizeSel" min="14" max="90" step="1">
+
+    <label>Glow <span class="val" id="glowVal"></span></label>
+    <input type="range" id="glowSel" min="0" max="45" step="1">
+  </div>
+
+  <div class="section sec-spawn">
+    <div class="section-title">Timing</div>
+
+    <label>Fade in (s) <span class="val" id="fadeInVal"></span></label>
+    <input type="range" id="fadeInSel" min="0.2" max="6" step="0.1">
+
+    <label>Hold (s) <span class="val" id="holdVal"></span></label>
+    <input type="range" id="holdSel" min="0" max="20" step="0.5">
+
+    <label>Fade out (s) <span class="val" id="fadeOutVal"></span></label>
+    <input type="range" id="fadeOutSel" min="0.5" max="15" step="0.5">
+  </div>
+
+  <!-- ================= FLOATING ONLY ================= -->
+  <div class="section sec-floating">
+    <div class="section-title">Floating text</div>
+
+    <label>Size variation <span class="val" id="sizeVarVal"></span></label>
+    <input type="range" id="sizeVarSel" min="0" max="0.8" step="0.05">
+
+    <label>Rotation <span class="val" id="rotVal"></span></label>
+    <input type="range" id="rotSel" min="0" max="35" step="1">
+  </div>
+
+  <div class="section sec-floating">
+    <div class="section-title">Entering &amp; leaving</div>
+
+    <label>Entry</label>
+    <select id="entrySel">
+      <option value="fade">Fade in</option>
+      <option value="typewriter">Typewriter</option>
+      <option value="blur">Blur into focus</option>
+      <option value="grow">Grow from small</option>
+      <option value="collapse">Collapse from large</option>
+      <option value="assemble">Letters assemble</option>
+    </select>
+
+    <label>Exit</label>
+    <select id="exitSel">
+      <option value="fade">Fade out</option>
+      <option value="scatter">Letters scatter</option>
+      <option value="particles">Dissolve to particles</option>
+      <option value="blur">Blur away</option>
+    </select>
+  </div>
+
+  <div class="section sec-floating">
+    <div class="section-title">Motion</div>
+
+    <label>Movement</label>
+    <select id="fieldSel">
+      <option value="drift">Slow drift</option>
+      <option value="rise">Rise like smoke</option>
+      <option value="rain">Fall like rain</option>
+      <option value="flow">Flow field (wander)</option>
+      <option value="still">Still</option>
+    </select>
+
+    <label>Speed <span class="val" id="speedVal"></span></label>
+    <input type="range" id="speedSel" min="0" max="2" step="0.05">
+
+    <label>Tremble <span class="val" id="trembleVal"></span></label>
+    <input type="range" id="trembleSel" min="0" max="1" step="0.05">
+
+    <label>Flicker <span class="val" id="flickerVal"></span></label>
+    <input type="range" id="flickerSel" min="0" max="1" step="0.05">
+  </div>
+
+  <div class="section sec-floating">
+    <div class="section-title">Spectral treatments</div>
+
+    <label>Ghost echo <span class="val" id="echoVal"></span></label>
+    <input type="range" id="echoSel" min="0" max="1" step="0.05">
+
+    <label>Colour split <span class="val" id="splitVal"></span></label>
+    <input type="range" id="splitSel" min="0" max="10" step="0.5">
+
+    <label>Breathing glow <span class="val" id="breathVal"></span></label>
+    <input type="range" id="breathSel" min="0" max="1" step="0.05">
+  </div>
+
+  <div class="section sec-voicereact">
+    <div class="section-title">Voice reactivity</div>
+
+    <label>Loudness → size <span class="val" id="reactSizeVal"></span></label>
+    <input type="range" id="reactSizeSel" min="0" max="1" step="0.05">
+
+    <label>Loudness → glow <span class="val" id="reactGlowVal"></span></label>
+    <input type="range" id="reactGlowSel" min="0" max="1" step="0.05">
+  </div>
+
+  <button id="resetBtn">Reset to defaults</button>
+</div>
+
+<div id="status"><div id="statusDot"></div><span id="statusText">waiting</span></div>
+<div id="dl"><span id="dlText"></span><div id="dlBar"><div id="dlFill"></div></div></div>
+
+<script>
+/* =========================================================
+   TEXT PLOT — live speech → fading apparitions
+   companion to Light Plot, Projection Plot & Stage Plot
+
+   three recognition engines:
+   · Web Speech API (Chrome, online, word-by-word)
+   · Whisper in-browser (offline after first download,
+     auto language detection, code-switched speech)
+   · Whisper local server (whisper.cpp, best accuracy)
+
+   S: settings
+
+   >>> TO EDIT THE ABOUT TEXT AND FOOTER CREDIT, change
+   >>> CONFIG.aboutText and CONFIG.footerText just below.
+   >>> They are intentionally not editable from the interface
+   >>> and are never overwritten by loaded scene files.
+   ========================================================= */
+
+/* ============================================================
+   CONFIG — single point of adjustment for on-site calibration
+   ============================================================ */
+const CONFIG = {
+  footerText: '\u00A9 Gaurav Singh Nijjer 2026',
+
+  aboutText:
+`TEXT PLOT
+a live transcription instrument for performance and
+installation. speak, and the words appear as fading
+apparitions on the canvas. companion to Light Plot,
+Projection Plot and Stage Plot.
+
+three modes
+· live — the mic listens and text appears as it is
+  spoken, either floating as apparitions or gathered
+  as subtitles.
+· text — paste any text and it plays out word by
+  word with the same looks as the live mode.
+· manual — upload a script, edit the auto-split
+  cues, and trigger each one by hand. surtitle style.
+
+live engines
+· web speech — instant, word-by-word. needs chrome
+  and an internet connection.
+· whisper (browser) — downloads a model once, then
+  runs fully offline. auto-detects language and
+  handles code-switched speech.
+· whisper (local server) — best accuracy, points at
+  a running whisper.cpp server.
+
+live extras
+· translation: whisper → english offline, or
+  mymemory online into indian languages.
+
+manual extras
+· cues split to a set word count, recalculable.
+· characters: per-speaker style and colour, names
+  detected from NAME: prefixes in the script.
+· machine translation into indian languages, shown
+  alone, stacked with the original, or split across
+  two boxes for two projectors.
+· safe-area boxes outline the largest cue per
+  language block, for setting crops once in OBS
+  or Isadora.
+· show / hide for blanking between cues, and cue
+  export / load so an edited list is never lost.
+
+recording
+· the record button captures the canvas to a .webm
+  video file, ready for editing or OBS.
+
+shortcuts
+S — settings panel
+C — cue editor (manual mode)
+↑ ↓ — previous / next cue (manual mode)
+
+notes
+· serve over localhost so chrome remembers the
+  microphone permission between sessions.
+
+made by gaurav singh nijjer with claude
+gauravnijjer.com`,
+
+  // Recognition
+  engine: 'webspeech',            // 'webspeech' | 'whisper-browser' | 'whisper-server'
+  language: 'en-IN',              // 'auto' works with the Whisper engines only
+  whisperModel: 'onnx-community/whisper-base',
+  serverUrl: 'http://127.0.0.1:8080/inference',
+  maxWordsPerCluster: 3,
+
+  // Translation
+  translateMode: 'off',           // 'off' | 'mymemory' | 'whisper-en'
+  targetLang: 'en',               // MyMemory target
+  translateDisplay: 'both',       // 'both' | 'translated'
+
+  // Text animation
+  animPace: 2,                    // words per second
+  animLoop: 'off',
+
+  // Script / cues (manual mode)
+  cueTranslate: 'off',            // machine-translate cues (free service, needs internet)
+  cueTargetLang: 'hi',            // translation target
+  cueTransDisplay: 'both-one',    // 'original' | 'translated' | 'both-one' | 'both-two'
+  importMode: 'dialogues',        // 'dialogues' strips names & stage directions; 'full' keeps everything
+  maxWordsPerCue: 8,              // cue auto-split length, adjustable + recalculable
+  showSafeArea: 'off',            // 'on' outlines the largest cue for OBS / Isadora cropping
+  showCharNames: 'off',           // 'on' prints the speaker name before each cue
+
+  // Canvas
+  appMode: 'live',                // 'live' (mic-driven) | 'manual' (cued script)
+  liveLayout: 'floating',         // live sub-mode: 'floating' | 'subtitles'
+  bgColor: '#000000',
+  trails: 0,                      // 0 = clean clear, towards 1 = long ghost trails
+  silenceDim: 0.4,                // how far the canvas darkens in silence, 0–1
+
+  // Text
+  font: 'Georgia, serif',
+  textColor: '#d8d8d8',
+  baseSize: 34,
+  sizeVariation: 0.45,
+  maxRotationDeg: 6,
+  glow: 18,
+
+  // Entry / exit
+  entryStyle: 'fade',             // fade | typewriter | blur | grow | collapse | assemble
+  exitStyle: 'fade',              // fade | scatter | particles | blur
+  fadeInSec: 2.0,
+  holdSec: 5.0,
+  fadeOutSec: 5.0,
+
+  // Motion
+  motionField: 'drift',           // drift | rise | rain | flow | still
+  driftSpeed: 0.25,
+  tremble: 0.1,
+  flickerAmount: 0.1,
+
+  // Spectral treatments
+  echo: 0,                        // faint offset copies
+  rgbSplit: 0,                    // px of red/blue separation
+  breathGlow: 0.2,                // slow pulse on the glow
+
+  // Voice reactivity
+  reactSize: 0.3,                 // loudness at the moment of speech → word size
+  reactGlow: 0.2,                 // live loudness → glow
+
+  // Subtitle mode
+  subtitleLines: 3,
+  subtitleY: 0.82,
+  subtitleLineHeight: 1.5,
+
+  // Internals worth exposing to a calibrator
+  margin: 90,
+  voiceThreshold: 0.012,          // RMS above this counts as speech
+  whisperChunkSec: 3.5,           // max seconds of audio per Whisper pass
+  whisperGapMs: 700               // silence gap that triggers an early pass
+};
+
+// Snapshot of defaults, taken before any mutation, for the reset button
+const DEFAULTS = JSON.parse(JSON.stringify(CONFIG));
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let ghosts = [];
+let particles = [];
+let subtitleRows = [];
+let began = false;
+let panelOpen = false;
+
+let recognition = null;           // Web Speech
+let interimWordCount = 0;
+let restartTimer = null;
+
+let micStream = null, audioCtx = null, analyser = null, procNode = null;
+let amp = 0;                      // smoothed mic loudness 0..~0.5
+let lastVoiceMs = 0;
+
+let whisperPipe = null, whisperLoading = false, whisperBusy = false;
+let chunkBuf = [], chunkHasVoice = false, chunkStartMs = 0, lastChunkVoiceMs = 0;
+
+let scriptDoc = null;             // {name, raw, wordCount}
+let cues = [];                    // [{text, char}] — char is a detected speaker name or null
+let characters = [];              // [{name, style, color}]
+let cueIndex = -1, cueChangedAt = 0, drawerOpen = false, cueVisible = true;
+let boundsCacheKey = '', boundsCache = null;
+
+let animWords = [], animPos = 0, animPlaying = false, animNextAt = 0;
+let recorder = null, recChunks = [], recStartMs = 0, recTimer = null;
+
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   p5 SKETCH
+   ============================================================ */
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  noStroke();
+  drawBackground(true);
+}
+function windowResized() { resizeCanvas(windowWidth, windowHeight); drawBackground(true); }
+
+function draw() {
+  const now = millis();
+  drawBackground(false);
+
+  if (CONFIG.appMode === 'anim') tickAnim(now);
+
+  if (CONFIG.appMode === 'manual') {
+    drawCued(now);
+    if (CONFIG.showSafeArea === 'on') drawSafeArea();
+  } else if (CONFIG.liveLayout === 'floating') {
+    for (let i = ghosts.length - 1; i >= 0; i--) {
+      if (!renderGhost(ghosts[i], now)) ghosts.splice(i, 1);
+    }
+  } else {
+    drawSubtitles(now);
+  }
+  renderParticles(now);
+  drawSilenceDim(now);
+}
+
+function drawBackground(hard) {
+  const c = color(CONFIG.bgColor);
+  if (hard || CONFIG.trails <= 0) {
+    background(c);
+  } else {
+    // translucent wash instead of a clear leaves ghost trails behind moving text
+    push();
+    drawingContext.shadowBlur = 0;
+    fill(red(c), green(c), blue(c), lerp(255, 6, CONFIG.trails));
+    rect(0, 0, width, height);
+    pop();
+  }
+}
+
+function drawSilenceDim(now) {
+  if (CONFIG.silenceDim <= 0 || !began) return;
+  const quiet = constrain((now - lastVoiceMs - 2500) / 12000, 0, 1); // starts after 2.5 s, full at ~14.5 s
+  if (quiet <= 0) return;
+  push();
+  drawingContext.shadowBlur = 0;
+  fill(0, 0, 0, 255 * quiet * CONFIG.silenceDim);
+  rect(0, 0, width, height);
+  pop();
+}
+
+/* ---------- Easing & alpha envelope ---------- */
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+function phases(ageMs) {
+  const fi = CONFIG.fadeInSec * 1000, h = CONFIG.holdSec * 1000, fo = CONFIG.fadeOutSec * 1000;
+  return {
+    pIn: constrain(ageMs / fi, 0, 1),
+    pOut: constrain((ageMs - fi - h) / fo, 0, 1),
+    dead: ageMs >= fi + h + fo
+  };
+}
+
+/* ---------- Ghost rendering ---------- */
+function currentGlow(now, g) {
+  let gl = CONFIG.glow;
+  if (CONFIG.breathGlow > 0) gl *= 1 + CONFIG.breathGlow * 0.6 * Math.sin(now * 0.0016 + g.seed);
+  if (CONFIG.reactGlow > 0) gl *= 1 + CONFIG.reactGlow * amp * 10;
+  return Math.max(0, gl);
+}
+
+function needsLetters(g) {
+  return g.entry === 'typewriter' || g.entry === 'assemble' || g.exit === 'scatter';
+}
+
+function buildLetters(g, size) {
+  push();
+  textFont(g.font); textSize(size);
+  const chars = [...g.text];
+  const total = textWidth(g.text);
+  let x = -total / 2;
+  g.letters = chars.map(ch => {
+    const w = textWidth(ch);
+    const L = {
+      ch, dx: x + w / 2,
+      ax: random(-140, 140), ay: random(-100, 100),          // assemble start offsets
+      sx: random(-1, 1), sy: random(-1, 1)                    // scatter direction
+    };
+    const m = Math.hypot(L.sx, L.sy) || 1;
+    L.sx /= m; L.sy /= m;
+    x += w;
+    return L;
+  });
+  pop();
+}
+
+function updateMotion(g, now) {
+  const s = CONFIG.driftSpeed;
+  let vx = 0, vy = 0;
+  switch (CONFIG.motionField) {
+    case 'drift': vx = g.vx * s * 4; vy = g.vy * s * 4; break;
+    case 'rise':  vx = 0.3 * s * Math.sin(now * 0.0005 + g.seed); vy = -s * 1.2; break;
+    case 'rain':  vx = 0.15 * s * Math.sin(now * 0.0008 + g.seed); vy = s * 1.8; break;
+    case 'flow': {
+      const a = noise(g.x * 0.0015, g.y * 0.0015, now * 0.00008) * TWO_PI * 2;
+      vx = Math.cos(a) * s * 1.4; vy = Math.sin(a) * s * 1.4; break;
+    }
+    case 'still': break;
+  }
+  g.x += vx; g.y += vy;
+  // gentle wrap so long-lived ghosts in rise/rain modes recycle
+  if (g.y < -80) g.y = height + 60;
+  if (g.y > height + 80) g.y = -60;
+  if (g.x < -140) g.x = width + 120;
+  if (g.x > width + 140) g.x = -120;
+}
+
+function renderGhost(g, now) {
+  const age = now - g.birth;
+  const ph = phases(age);
+  if (ph.dead) return false;
+
+  updateMotion(g, now);
+
+  let alpha = ph.pIn < 1 ? easeOut(ph.pIn) : 1 - ph.pOut;
+  let scaleF = 1, blurPx = 0;
+
+  // Entry styles
+  if (g.entry === 'blur' && ph.pIn < 1) blurPx = (1 - easeOut(ph.pIn)) * 8;
+  if (g.entry === 'grow') scaleF *= lerp(0.15, 1, easeOut(ph.pIn));
+  if (g.entry === 'collapse') scaleF *= lerp(2.6, 1, easeOut(ph.pIn));
+
+  // Exit styles
+  if (g.exit === 'blur' && ph.pOut > 0) blurPx = Math.max(blurPx, ph.pOut * 10);
+  if (g.exit === 'particles' && ph.pOut > 0) {
+    if (!g.burst) { burstParticles(g); g.burst = true; }
+    alpha *= Math.max(0, 1 - ph.pOut * 3); // text vanishes quickly, particles carry the exit
+  }
+
+  if (alpha <= 0.003) return !(ph.pOut >= 1);
+
+  const effSize = g.size * (CONFIG.baseSize / DEFAULTS.baseSize) * g.ampBoost;
+  if (needsLetters(g) && !g.letters) buildLetters(g, effSize);
+
+  const tremX = CONFIG.tremble * 7 * (noise(g.seed, now * 0.012) - 0.5) * 2;
+  const tremY = CONFIG.tremble * 7 * (noise(g.seed + 50, now * 0.012) - 0.5) * 2;
+  const flick = 1 - CONFIG.flickerAmount * (0.5 + 0.5 * Math.sin(now * 0.004 + g.seed * 7)) * Math.random() * 0.6;
+
+  const ctx = drawingContext;
+  push();
+  translate(g.x + tremX, g.y + tremY);
+  rotate(g.rot);
+  scale(scaleF);
+  textFont(g.font);
+  textSize(effSize);
+  textAlign(CENTER, CENTER);
+
+  ctx.filter = blurPx > 0.3 ? `blur(${blurPx.toFixed(1)}px)` : 'none';
+  const gl = currentGlow(now, g);
+  ctx.shadowBlur = gl;
+  ctx.shadowColor = CONFIG.textColor;
+
+  const base = color(CONFIG.textColor);
+  const a255 = 255 * alpha * flick;
+
+  if (CONFIG.rgbSplit > 0) {
+    ghostContent(g, ph, color(255, 70, 70), a255 * 0.55, -CONFIG.rgbSplit, 0);
+    ghostContent(g, ph, color(90, 170, 255), a255 * 0.55, CONFIG.rgbSplit, 0);
+  }
+  if (CONFIG.echo > 0) {
+    ghostContent(g, ph, base, a255 * CONFIG.echo * 0.3, 5, 4);
+    ghostContent(g, ph, base, a255 * CONFIG.echo * 0.18, -4, 7);
+  }
+  ghostContent(g, ph, base, a255, 0, 0);
+
+  // Translation beneath the original, smaller and quieter
+  if (g.sub) {
+    textSize(effSize * 0.5);
+    fill(red(base), green(base), blue(base), a255 * 0.7);
+    text(g.sub, 0, effSize * 0.85);
+  }
+
+  ctx.filter = 'none';
+  ctx.shadowBlur = 0;
+  pop();
+  return true;
+}
+
+/* Draws the ghost's text once, honouring per-letter entry/exit styles */
+function ghostContent(g, ph, col, a255, ox, oy) {
+  fill(red(col), green(col), blue(col), a255);
+  if (!needsLetters(g)) { text(g.text, ox, oy); return; }
+
+  const n = g.letters.length;
+  const visible = g.entry === 'typewriter' ? Math.ceil(easeOut(ph.pIn) * n) : n;
+  const asm = g.entry === 'assemble' ? 1 - easeOut(ph.pIn) : 0;
+  const sct = g.exit === 'scatter' ? ph.pOut * 110 : 0;
+
+  for (let i = 0; i < visible; i++) {
+    const L = g.letters[i];
+    const x = L.dx + L.ax * asm + L.sx * sct + ox;
+    const y = L.ay * asm + L.sy * sct * 0.7 + oy;
+    text(L.ch, x, y);
+  }
+}
+
+/* ---------- Particles (dissolve exit) ---------- */
+function burstParticles(g) {
+  push();
+  textFont(g.font); textSize(g.size);
+  const w = textWidth(g.text);
+  pop();
+  const count = Math.min(60, Math.max(18, Math.floor(w / 6)));
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: g.x + random(-w / 2, w / 2),
+      y: g.y + random(-g.size * 0.4, g.size * 0.4),
+      vx: random(-0.4, 0.4),
+      vy: random(-0.9, -0.15),
+      r: random(1, 2.6),
+      birth: millis(),
+      life: CONFIG.fadeOutSec * 1000 * random(0.6, 1)
+    });
+  }
+}
+
+function renderParticles(now) {
+  if (!particles.length) return;
+  const col = color(CONFIG.textColor);
+  push();
+  drawingContext.shadowBlur = 0;
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    const t = (now - p.birth) / p.life;
+    if (t >= 1) { particles.splice(i, 1); continue; }
+    p.x += p.vx; p.y += p.vy; p.vy *= 0.995;
+    fill(red(col), green(col), blue(col), 200 * (1 - t));
+    circle(p.x, p.y, p.r);
+  }
+  pop();
+}
+
+/* ---------- Subtitle mode ---------- */
+function drawSubtitles(now) {
+  const ctx = drawingContext;
+  const col = color(CONFIG.textColor);
+  textAlign(CENTER, CENTER);
+  textFont(CONFIG.font);
+  textSize(CONFIG.baseSize);
+  ctx.shadowBlur = CONFIG.glow; ctx.shadowColor = CONFIG.textColor;
+
+  const totalLife = (CONFIG.fadeInSec + CONFIG.holdSec + CONFIG.fadeOutSec) * 1000;
+  subtitleRows = subtitleRows.filter(r => now - r.birth < totalLife + 2000);
+
+  const rows = subtitleRows.slice(-CONFIG.subtitleLines);
+  const lh = CONFIG.baseSize * CONFIG.subtitleLineHeight;
+  const baseY = height * CONFIG.subtitleY - (rows.length - 1) * lh;
+
+  rows.forEach((r, i) => {
+    const ph = phases(now - r.birth);
+    const a = ph.pIn < 1 ? easeOut(ph.pIn) : 1 - ph.pOut;
+    if (a <= 0) return;
+    fill(red(col), green(col), blue(col), 255 * a);
+    text(r.text, width / 2, baseY + i * lh);
+  });
+  ctx.shadowBlur = 0;
+}
+
+/* ============================================================
+   SCRIPT & CUES — upload, auto-split, characters, safe area
+   ============================================================ */
+/* Speaker prefixes: 1–3 words then a colon, e.g. "ASHA:" or
+   "Guard 2:". Must contain at least one letter. */
+const CHAR_RE = /^([^\s:]{1,25}(?:[ \t]+[^\s:]{1,25}){0,2})\s*:\s*/;
+
+/* ---------- PDF line reconstruction ----------
+   pdf.js returns loose text fragments; grouping them by their
+   Y coordinate and sorting by X rebuilds the page's real lines,
+   which the dialogue extractor depends on. Fragments are joined
+   with a space only across a real horizontal gap, so scripts in
+   Devanagari and other Indic text keep their words whole. */
+function pdfPageToLines(tc) {
+  const rows = new Map();
+  for (const it of tc.items) {
+    if (!it.str || !it.str.trim()) continue;
+    const y = Math.round(it.transform[5] / 4) * 4;
+    if (!rows.has(y)) rows.set(y, []);
+    rows.get(y).push(it);
+  }
+  return [...rows.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([y, items]) => {
+      items.sort((a, b) => a.transform[4] - b.transform[4]);
+      let out = '', endX = null;
+      for (const it of items) {
+        const x = it.transform[4];
+        if (endX !== null && x - endX > 1.5) out += ' ';
+        out += it.str;
+        endX = x + (it.width || 0);
+      }
+      return out.replace(/\s+/g, ' ').trim();
+    });
+}
+
+/* ---------- Dialogue extraction ----------
+   For stage-script layout: speaker names alone on a line,
+   dialogue beneath, directions as plain paragraphs.
+   · pass 1 counts short all-caps lines — names recur across the
+     script (NOOR, FATHER), scene headings appear once, so
+     frequency separates them without a fixed list.
+   · pass 2 walks the lines: a speaker line opens a speech; the
+     first following line is taken as dialogue; later lines are
+     dropped once they read as a stage direction (parenthetical,
+     mentions a character in the third person, or leads with an
+     action verb, with no I/you/my words). Wrapped continuation
+     lines starting lowercase always stay part of the speech.
+   Output is NAME: text blocks, which the cue splitter already
+   understands. Never perfect on every format — the cue editor
+   is the final pass — but exact on standard layouts. */
+function extractDialogues(lines) {
+  const capsRE = /^[A-Z0-9 &/()'’.\-]+$/;
+  const normSpeaker = l => l.replace(/\([^)]*\)/g, '').replace(/\s+\d+$/, '').replace(/\s+/g, ' ').trim();
+
+  const counts = {};
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (l && l.length <= 30 && capsRE.test(l) && /[A-Z]/.test(l)) {
+      const n = l.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+      if (n) counts[n] = (counts[n] || 0) + 1;
+    }
+  }
+  const speakers = new Set(Object.keys(counts).filter(n => counts[n] >= 2).map(normSpeaker));
+  const speakerFirstWords = new Set([...speakers].map(x => x.split(' ')[0]));
+  const speakersLower = new Set([...speakers].map(x => x.toLowerCase()));
+
+  const isSpeakerLine = l => {
+    if (l.length > 30) return false;
+    const n = normSpeaker(l);
+    if (!n) return false;
+    if (capsRE.test(l)) {
+      if (speakers.has(n)) return n;
+      if (speakerFirstWords.has(n.split(' ')[0])) return n;
+      return false;
+    }
+    if (speakersLower.has(n.toLowerCase())) return n.toUpperCase();
+    return false;
+  };
+  const isHeading = l => l.length <= 34 && capsRE.test(l) && !isSpeakerLine(l);
+
+  const firstSecond = /\b(i|i'm|i’m|you|your|yours|my|me|mine|we|our|us)\b/i;
+  const actionVerb = /\b(waits?|looks?|goes|starts?|enters?|leaves?|takes?|picks?|gets?|comes?|walks?|sits?|stands?|turns?|begins?|continues?|finishes?|stops?|reacts?|gestures?|points?|laughs?|runs?|brings?|places?|moves?|watches|freezes?|nods?|hugs?|grabs|throws?|catches|dials?|returns?|blushes|repeats?|settles?|appears?|fades?|steps?|calls?|asks?|instructs?|signals?|collapses?|hesitates?|drinks?|feeds?|cleans?|joins?|notices?|holds?|opens?|closes?|clicks?|writes?|reads?|rises?|hands?)\b/;
+
+  const isDirection = (l) => {
+    if (/^\(/.test(l)) return true;
+    if (/^[a-z\u0900-\u0DFF]/.test(l)) return false; // wrapped continuation of a speech
+    if (firstSecond.test(l)) return false;
+    const fw = (l.split(/\s+/)[0] || '').replace(/[^A-Za-z]/g, '').toLowerCase();
+    if (['the','he','she','they','both','everyone','music','musicians','lights','light','scene',
+         'stage','pause','silence','blackout','suddenly','finally','slowly','now','after','once',
+         'general','a','an','at','photos','their'].includes(fw)) return true;
+    for (const sp of speakersLower) {
+      const w = sp.split(' ')[0];
+      if (w.length > 2 && new RegExp('\\b' + w + '\\b', 'i').test(l)) return true;
+    }
+    if (actionVerb.test(l.split(/\s+/).slice(0, 4).join(' '))) return true;
+    return false;
+  };
+
+  const speeches = [];
+  let speaker = null, buf = [], firstLine = false, stopped = false;
+  const flush = () => {
+    if (speaker && buf.length) {
+      const text = buf.join(' ').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+      if (text) speeches.push(speaker + ': ' + text);
+    }
+    buf = [];
+  };
+
+  for (const raw of lines) {
+    let l = raw.trim();
+    if (!l) continue;
+    if (/^\d+$/.test(l)) continue;                      // standalone page numbers
+    l = l.replace(/([a-z!?.…"'’”])\d{1,3}$/, '$1');     // page number glued to a line end
+
+    const sp = isSpeakerLine(l);
+    if (sp) { flush(); speaker = sp; firstLine = true; stopped = false; continue; }
+    if (isHeading(l)) { flush(); speaker = null; continue; }
+    if (!speaker || stopped) continue;
+
+    if (/^\(.*\)$/.test(l)) continue;                   // pure parenthetical
+    if (firstLine) { buf.push(l); firstLine = false; continue; }
+    if (isDirection(l)) { flush(); stopped = true; continue; }
+    buf.push(l);
+  }
+  flush();
+  return { text: speeches.join('\n\n') };
+}
+
+function loadScriptText(name, rawFull) {
+  scriptDoc = { name, rawFull, wordCount: rawFull.split(/\s+/).filter(Boolean).length };
+  rebuildCues();
+  setStatus(true, `script loaded · ${scriptDoc.wordCount} words · ${cues.length} cues`);
+}
+
+function rebuildCues() {
+  if (!scriptDoc) return;
+  let source = scriptDoc.rawFull;
+  if (CONFIG.importMode === 'dialogues') {
+    const d = extractDialogues(scriptDoc.rawFull.split(/\r?\n/));
+    if (d.text.trim()) source = d.text;
+    else setStatus(false, 'no dialogue structure found — importing the full text instead');
+  }
+  cues = splitIntoCues(source);
+  cueIndex = -1; cueVisible = true;
+  // auto-populate detected characters, keeping any already defined
+  const known = new Set(characters.map(c => c.name.toLowerCase()));
+  for (const c of cues) {
+    if (c.char && !known.has(c.char.toLowerCase())) {
+      characters.push({ name: c.char, style: 'normal', color: CONFIG.textColor });
+      known.add(c.char.toLowerCase());
+    }
+  }
+  renderCueList(); renderCharList(); updateScriptInfo(); updateCueVisButtons();
+  boundsCacheKey = '';
+}
+
+function updateScriptInfo() {
+  const el = $('scriptInfo');
+  el.textContent = scriptDoc
+    ? `${scriptDoc.name} · ${scriptDoc.wordCount} words · ${cues.length} cues`
+    : 'no script loaded';
+}
+
+/* ---------- Cue splitting ----------
+   Blocks break at blank lines and at speaker-prefix lines.
+   Each block's speaker (NAME:) is stripped into metadata and
+   carried across every cue split from that block. Blocks are
+   then chopped into runs of CONFIG.maxWordsPerCue words. */
+function splitIntoCues(raw) {
+  const lines = raw.split(/\r?\n/);
+  const blocks = [];
+  let cur = [];
+  const close = () => { if (cur.length) { blocks.push(cur.join(' ')); cur = []; } };
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { close(); continue; }
+    const cm = t.match(CHAR_RE);
+    if (cm && /[A-Za-z\u0900-\u097F\u0980-\u0DFF]/.test(cm[1])) close();
+    cur.push(t);
+  }
+  close();
+
+  const result = [];
+  for (let b of blocks) {
+    b = b.replace(/\s+/g, ' ').trim();
+    let char = null;
+    const cm = b.match(CHAR_RE);
+    if (cm && /[A-Za-z\u0900-\u097F\u0980-\u0DFF]/.test(cm[1])) {
+      char = cm[1].trim();
+      b = b.slice(cm[0].length);
+    }
+    const words = b.split(' ').filter(Boolean);
+    for (let i = 0; i < words.length; i += CONFIG.maxWordsPerCue) {
+      result.push({ text: words.slice(i, i + CONFIG.maxWordsPerCue).join(' '), char });
+    }
+  }
+  return result;
+}
+
+$('recalcBtn').addEventListener('click', () => {
+  if (!scriptDoc) { setStatus(false, 'upload a script first'); return; }
+  rebuildCues();
+  setStatus(true, `recalculated · ${cues.length} cues of up to ${CONFIG.maxWordsPerCue} words`);
+});
+
+/* ---------- File handling: .txt / .md directly, .pdf via pdf.js ---------- */
+$('scriptBtn').addEventListener('click', () => $('scriptFile').click());
+$('scriptFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  if (/\.pdf$/i.test(f.name)) {
+    setStatus(false, 'reading PDF…');
+    try {
+      if (!window.pdfjsLib) {
+        await new Promise((res, rej) => {
+          const sc = document.createElement('script');
+          sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          sc.onload = res; sc.onerror = rej;
+          document.head.appendChild(sc);
+        });
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const buf = await f.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const allLines = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const tc = await (await pdf.getPage(i)).getTextContent();
+        allLines.push(...pdfPageToLines(tc));
+      }
+      loadScriptText(f.name, allLines.join('\n'));
+    } catch (err) {
+      setStatus(false, 'could not read that PDF — internet is needed once to fetch the PDF reader');
+    }
+  } else {
+    const r = new FileReader();
+    r.onload = () => loadScriptText(f.name, r.result);
+    r.readAsText(f);
+  }
+});
+
+$('clearScriptBtn').addEventListener('click', () => {
+  scriptDoc = null; cues = []; cueIndex = -1;
+  renderCueList(); updateScriptInfo();
+  boundsCacheKey = '';
+});
+
+/* ---------- Characters ---------- */
+function renderCharList() {
+  const list = $('charList');
+  list.innerHTML = '';
+  characters.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'charRow';
+    const del = document.createElement('button');
+    del.className = 'del'; del.textContent = '×'; del.title = 'remove character';
+    del.addEventListener('click', () => { characters.splice(i, 1); renderCharList(); renderCueList(); boundsCacheKey = ''; });
+    const name = document.createElement('input');
+    name.type = 'text'; name.value = c.name; name.placeholder = 'character name';
+    name.addEventListener('input', () => { c.name = name.value; boundsCacheKey = ''; });
+    name.addEventListener('change', renderCueList);
+    const row = document.createElement('div'); row.className = 'row';
+    const style = document.createElement('select');
+    for (const [v, t] of [['normal','normal'],['italic','italic'],['bold','bold'],['bolditalic','bold italic']]) {
+      const o = document.createElement('option'); o.value = v; o.textContent = t; style.appendChild(o);
+    }
+    style.value = c.style;
+    style.addEventListener('change', () => { c.style = style.value; boundsCacheKey = ''; });
+    const colr = document.createElement('input');
+    colr.type = 'color'; colr.value = c.color;
+    colr.addEventListener('input', () => { c.color = colr.value; });
+    row.appendChild(style); row.appendChild(colr);
+    div.appendChild(del); div.appendChild(name); div.appendChild(row);
+    list.appendChild(div);
+  });
+}
+$('addCharBtn').addEventListener('click', () => {
+  characters.push({ name: '', style: 'normal', color: CONFIG.textColor });
+  renderCharList();
+  const inputs = $('charList').querySelectorAll('input[type="text"]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+
+function getCharDef(name) {
+  if (!name) return null;
+  return characters.find(c => c.name && c.name.toLowerCase() === name.toLowerCase()) || null;
+}
+/* p5's textStyle constants are plain strings underneath; using the
+   strings directly avoids touching p5 globals before p5 has loaded */
+const STYLE_MAP = { normal: 'normal', italic: 'italic', bold: 'bold', bolditalic: 'bold italic' };
+
+/* ---------- Cue drawer (editable) ---------- */
+function renderCueList() {
+  const list = $('cueList');
+  list.innerHTML = '';
+  cues.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'cue' + (i === cueIndex ? ' active' : '');
+    const head = document.createElement('div');
+    head.className = 'cueHead';
+    const left = document.createElement('span');
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = 'cue ' + (i + 1);
+    num.title = 'jump to this cue';
+    num.addEventListener('click', () => setCue(i));
+    left.appendChild(num);
+    if (c.char) {
+      const tag = document.createElement('span');
+      tag.className = 'char';
+      tag.textContent = c.char.toUpperCase();
+      left.appendChild(tag);
+    }
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = 'delete this cue';
+    del.addEventListener('click', () => {
+      cues.splice(i, 1);
+      if (cueIndex >= cues.length) cueIndex = cues.length - 1;
+      renderCueList(); updateScriptInfo(); boundsCacheKey = '';
+    });
+    head.appendChild(left); head.appendChild(del);
+    const ta = document.createElement('textarea');
+    ta.value = c.text;
+    ta.addEventListener('input', () => { c.text = ta.value; c.trans = null; boundsCacheKey = ''; });
+    div.appendChild(head); div.appendChild(ta);
+    list.appendChild(div);
+  });
+}
+$('addCueBtn').addEventListener('click', () => {
+  cues.push({ text: '', char: null });
+  renderCueList(); updateScriptInfo(); boundsCacheKey = '';
+  const tas = $('cueList').querySelectorAll('textarea');
+  if (tas.length) tas[tas.length - 1].focus();
+});
+
+function setCue(i) {
+  cueIndex = constrain(i, -1, cues.length); // -1 and cues.length are blank
+  cueChangedAt = millis();
+  cueVisible = true;
+  updateCueVisButtons();
+  prefetchTranslations();
+  const items = $('cueList').children;
+  for (let k = 0; k < items.length; k++) items[k].classList.toggle('active', k === cueIndex);
+  if (cueIndex >= 0 && cueIndex < items.length) {
+    // keep the operator's eye on what's coming: park the active cue in the
+    // top quarter of the drawer so the next few cues stay visible below it
+    const drawer = $('cueDrawer');
+    const target = items[cueIndex].offsetTop - drawer.clientHeight * 0.25;
+    drawer.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    setStatus(true, `cue ${cueIndex + 1} / ${cues.length}`);
+  } else {
+    setStatus(true, cueIndex < 0 ? 'before first cue (blank)' : 'after last cue (blank)');
+  }
+}
+function stepCue(dir) { setCue(cueIndex + dir); }
+
+function updateCueVisButtons() {
+  $('showCueBtn').classList.toggle('active', cueVisible);
+  $('hideCueBtn').classList.toggle('active', !cueVisible);
+}
+$('showCueBtn').addEventListener('click', () => { cueVisible = true; cueChangedAt = millis(); updateCueVisButtons(); });
+$('hideCueBtn').addEventListener('click', () => { cueVisible = false; updateCueVisButtons(); setStatus(true, 'cue hidden — blank screen'); });
+
+/* ---------- Cue export / import (guards against lost work) ---------- */
+$('exportCuesBtn').addEventListener('click', () => {
+  const data = {
+    app: 'TextPlot', kind: 'cues', version: 1,
+    maxWordsPerCue: CONFIG.maxWordsPerCue,
+    showCharNames: CONFIG.showCharNames,
+    characters, cues
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'textplot-cues.json';
+  a.click();
+  setStatus(true, `exported ${cues.length} cues`);
+});
+$('loadCuesBtn').addEventListener('click', () => $('cuesFile').click());
+$('cuesFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(r.result);
+      const loaded = Array.isArray(data) ? data : data.cues;
+      if (!Array.isArray(loaded)) throw new Error('no cues');
+      cues = loaded.map(c => typeof c === 'string'
+        ? { text: c, char: null }
+        : { text: c.text || '', char: c.char || null, trans: c.trans || null, transLang: c.transLang || null });
+      if (Array.isArray(data.characters)) characters = data.characters;
+      if (data.maxWordsPerCue) { CONFIG.maxWordsPerCue = data.maxWordsPerCue; }
+      if (data.showCharNames) { CONFIG.showCharNames = data.showCharNames; }
+      cueIndex = -1; cueVisible = true;
+      syncPanelFromConfig();
+      renderCueList(); renderCharList(); updateScriptInfo(); updateCueVisButtons();
+      boundsCacheKey = '';
+      setStatus(true, `loaded ${cues.length} cues`);
+    } catch (err) { setStatus(false, 'that file is not a valid cue export'); }
+  };
+  r.readAsText(f);
+});
+
+function toggleDrawer(force) {
+  drawerOpen = force !== undefined ? force : !drawerOpen;
+  $('cueDrawer').classList.toggle('open', drawerOpen);
+}
+$('cuesBtn').addEventListener('click', () => toggleDrawer());
+
+/* ---------- Cue translation ----------
+   Uses the free Google Translate endpoint (the one behind the
+   Translate widget — keyless but unofficial), with MyMemory as
+   an automatic fallback if it ever breaks. Results are stored
+   on each cue with the target language, exported with the cue
+   file, and invalidated when the cue text is edited. Upcoming
+   cues prefetch a few ahead while stepping; translate-all
+   prepares an entire show in one pass. */
+let cueTransBusy = false;
+const cueTransPending = new Set();
+
+async function machineTranslate(text, tgt) {
+  try {
+    const u = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='
+      + tgt + '&dt=t&q=' + encodeURIComponent(text);
+    const j = await (await fetch(u)).json();
+    const out = (j && j[0]) ? j[0].map(seg => seg[0]).join('') : '';
+    if (out.trim()) return out.trim();
+  } catch (err) { /* fall through */ }
+  try {
+    const u = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text)
+      + '&langpair=en|' + tgt;
+    const j = await (await fetch(u)).json();
+    const out = j && j.responseData && j.responseData.translatedText;
+    if (out && out.trim()) return out.trim();
+  } catch (err) { /* fall through */ }
+  return null;
+}
+
+function cueTrans(c) {
+  return (c.trans && c.transLang === CONFIG.cueTargetLang) ? c.trans : null;
+}
+
+async function ensureTranslated(i) {
+  const c = cues[i];
+  if (!c || !c.text.trim() || cueTrans(c) || cueTransPending.has(c)) return;
+  cueTransPending.add(c);
+  const out = await machineTranslate(c.text, CONFIG.cueTargetLang);
+  cueTransPending.delete(c);
+  if (out) { c.trans = out; c.transLang = CONFIG.cueTargetLang; boundsCacheKey = ''; }
+}
+
+function prefetchTranslations() {
+  if (CONFIG.cueTranslate !== 'on') return;
+  const from = Math.max(0, cueIndex);
+  for (let i = from; i < Math.min(cues.length, from + 7); i++) ensureTranslated(i);
+}
+
+$('transAllBtn').addEventListener('click', async () => {
+  if (cueTransBusy) return;
+  if (!cues.length) { setStatus(false, 'no cues to translate'); return; }
+  cueTransBusy = true;
+  let done = 0;
+  for (let i = 0; i < cues.length; i++) {
+    await ensureTranslated(i);
+    done++;
+    if (done % 10 === 0 || done === cues.length) {
+      setStatus(true, `translating cues… ${done} / ${cues.length}`);
+      await new Promise(r => setTimeout(r, 60)); // stay polite to the service
+    }
+  }
+  cueTransBusy = false;
+  const ok = cues.filter(c => cueTrans(c)).length;
+  setStatus(true, `translation done · ${ok} / ${cues.length} cues — export cues to keep them`);
+});
+
+function updateCueTransVisibility() {
+  $('cueTransWrap').classList.toggle('hidden', CONFIG.cueTranslate !== 'on');
+}
+
+/* ---------- Cued rendering ----------
+   The text block stays centred in the space left free by the
+   settings panel (left) and the cue drawer (right), so open
+   menus never cover it. Four display modes: original only,
+   translation only, both stacked in one bounding box for a
+   single projector, or both in two separate boxes so two crops
+   can feed two screens. */
+function cueMargins() {
+  const panelW = Math.min(290, width * 0.86);
+  const drawerW = Math.min(320, width * 0.86);
+  return {
+    lm: panelOpen ? panelW + 28 : width * 0.07,
+    rm: drawerOpen ? drawerW + 28 : width * 0.07
+  };
+}
+
+function cueDisplayText(c) {
+  return (CONFIG.showCharNames === 'on' && c.char) ? c.char.toUpperCase() + ' — ' + c.text : c.text;
+}
+
+function applyCharStyle(c) {
+  const def = getCharDef(c.char);
+  textStyle(def ? STYLE_MAP[def.style] || 'normal' : 'normal');
+  return def ? color(def.color) : color(CONFIG.textColor);
+}
+
+function cueLayout() {
+  // one place defines where each language block sits, shared by
+  // the renderer and the safe-area boxes so they can never drift
+  const mode = CONFIG.cueTranslate === 'on' ? CONFIG.cueTransDisplay : 'original';
+  if (mode === 'both-two') return {
+    mode,
+    orig:  { cy: 0.27, hFrac: 0.34, sizeMul: 1 },
+    trans: { cy: 0.73, hFrac: 0.34, sizeMul: 1 }
+  };
+  if (mode === 'both-one') return {
+    mode,
+    orig:  { cy: 0.50, hFrac: 0.76, sizeMul: 1 },     // stacked inside one box
+    trans: { sizeMul: 0.78 }
+  };
+  return { mode, orig: { cy: 0.50, hFrac: 0.76, sizeMul: 1 } };
+}
+
+function drawCueBlock(txt, c, alpha, x, yTop, w, h, vAlign, sizeMul) {
+  const ctx = drawingContext;
+  push();
+  textAlign(CENTER, vAlign);
+  textFont(CONFIG.font);
+  textSize(CONFIG.baseSize * sizeMul);
+  textLeading(CONFIG.baseSize * sizeMul * 1.45);
+  const col = applyCharStyle(c);
+  ctx.shadowBlur = CONFIG.glow; ctx.shadowColor = col.toString();
+  fill(red(col), green(col), blue(col), 255 * alpha);
+  text(txt, x, yTop, w, h);
+  textStyle('normal');
+  ctx.shadowBlur = 0;
+  pop();
+}
+
+function drawCued(now) {
+  if (!cueVisible || cueIndex < 0 || cueIndex >= cues.length) return;
+  const c = cues[cueIndex];
+  const orig = cueDisplayText(c);
+  if (!orig) return;
+  const a = easeOut(Math.min(1, (now - cueChangedAt) / Math.max(120, Math.min(CONFIG.fadeInSec, 1) * 1000)));
+  const { lm, rm } = cueMargins();
+  const bw = Math.max(120, width - lm - rm);
+  const L = cueLayout();
+  const trans = L.mode === 'original' ? null : (cueTrans(c) || null);
+
+  if (L.mode === 'translated') {
+    drawCueBlock(trans || orig, c, a, lm, height * (L.orig.cy - L.orig.hFrac / 2), bw, height * L.orig.hFrac, CENTER, 1);
+  } else if (L.mode === 'both-two') {
+    drawCueBlock(orig, c, a, lm, height * (L.orig.cy - L.orig.hFrac / 2), bw, height * L.orig.hFrac, CENTER, 1);
+    if (trans) drawCueBlock(trans, c, a, lm, height * (L.trans.cy - L.trans.hFrac / 2), bw, height * L.trans.hFrac, CENTER, 1);
+  } else if (L.mode === 'both-one') {
+    // original bottom-aligned above the midline, translation top-aligned below it
+    drawCueBlock(orig, c, a, lm, height * 0.10, bw, height * 0.385, BOTTOM, 1);
+    if (trans) drawCueBlock(trans, c, a * 0.85, lm, height * 0.515, bw, height * 0.375, TOP, L.trans.sizeMul);
+  } else {
+    drawCueBlock(orig, c, a, lm, height * (L.orig.cy - L.orig.hFrac / 2), bw, height * L.orig.hFrac, CENTER, 1);
+  }
+}
+
+/* ---------- Safe-area boxes ----------
+   Wraps every cue with the current type settings and outlines
+   the union of their extents, one box per language block, so a
+   crop set once in OBS or Isadora keeps every cue of the show
+   in frame. Recomputed only when cues, type, or layout change. */
+function measureCueTexts(getText, sizeMul, bw) {
+  const leading = CONFIG.baseSize * sizeMul * 1.45;
+  let maxW = 0, maxLines = 0;
+  textSize(CONFIG.baseSize * sizeMul);
+  for (const c of cues) {
+    const t = getText(c);
+    if (!t) continue;
+    const def = getCharDef(c.char);
+    textStyle(def ? STYLE_MAP[def.style] || 'normal' : 'normal');
+    const words = t.split(/\s+/).filter(Boolean);
+    let line = '', lines = 0;
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (textWidth(test) <= bw || !line) { line = test; }
+      else { maxW = Math.max(maxW, textWidth(line)); lines++; line = w; }
+    }
+    if (line) { maxW = Math.max(maxW, textWidth(line)); lines++; }
+    maxLines = Math.max(maxLines, lines);
+  }
+  return { maxW, maxLines, leading };
+}
+
+function computeCueBounds() {
+  const { lm, rm } = cueMargins();
+  const bw = Math.max(120, width - lm - rm);
+  const L = cueLayout();
+  const key = [cues.length, cues.reduce((n, c) => n + c.text.length + (cueTrans(c) || '').length, 0),
+    CONFIG.font, CONFIG.baseSize, CONFIG.glow, CONFIG.showCharNames, L.mode, CONFIG.cueTargetLang,
+    characters.map(c => c.name + c.style).join(','),
+    lm.toFixed(0), rm.toFixed(0), width, height].join('|');
+  if (key === boundsCacheKey && boundsCache) return boundsCache;
+
+  const pad = CONFIG.baseSize * 0.45 + CONFIG.glow * 0.6;
+  const boxes = [];
+  push();
+  textFont(CONFIG.font);
+
+  const box = (m, cy, label) => {
+    if (m.maxLines === 0) return;
+    const w = Math.min(bw, m.maxW) + pad * 2;
+    const h = m.maxLines * m.leading + pad * 2;
+    boxes.push({ x: lm + bw / 2 - w / 2, y: height * cy - h / 2, w, h, label });
+  };
+
+  if (L.mode === 'translated') {
+    box(measureCueTexts(c => cueTrans(c) || cueDisplayText(c), 1, bw), 0.5, 'translation');
+  } else if (L.mode === 'both-two') {
+    box(measureCueTexts(c => cueDisplayText(c), 1, bw), L.orig.cy, 'original');
+    box(measureCueTexts(c => cueTrans(c), 1, bw), L.trans.cy, 'translation');
+  } else if (L.mode === 'both-one') {
+    const mo = measureCueTexts(c => cueDisplayText(c), 1, bw);
+    const mt = measureCueTexts(c => cueTrans(c), L.trans.sizeMul, bw);
+    if (mo.maxLines || mt.maxLines) {
+      const w = Math.min(bw, Math.max(mo.maxW, mt.maxW)) + pad * 2;
+      const h = mo.maxLines * mo.leading + height * 0.03 + mt.maxLines * mt.leading + pad * 2;
+      boxes.push({ x: lm + bw / 2 - w / 2, y: height * 0.5 - h / 2, w, h, label: 'both languages' });
+    }
+  } else {
+    box(measureCueTexts(c => cueDisplayText(c), 1, bw), 0.5, 'original');
+  }
+  pop();
+
+  boundsCache = boxes.length ? boxes : null;
+  boundsCacheKey = key;
+  return boundsCache;
+}
+
+function drawSafeArea() {
+  const boxes = computeCueBounds();
+  if (!boxes) return;
+  const ctx = drawingContext;
+  push();
+  ctx.shadowBlur = 0;
+  textFont("'DM Mono', monospace");
+  textStyle('normal');
+  textSize(10);
+  for (const b of boxes) {
+    noFill();
+    stroke(122, 157, 122, 220);
+    strokeWeight(1);
+    ctx.setLineDash([6, 6]);
+    rect(b.x, b.y, b.w, b.h);
+    ctx.setLineDash([]);
+    noStroke();
+    fill(122, 157, 122, 220);
+    textAlign(LEFT, BOTTOM);
+    text(`${b.label}  ${Math.round(b.w)} × ${Math.round(b.h)} px  ·  ${Math.round(b.x)}, ${Math.round(b.y)}`, b.x, b.y - 6);
+  }
+  pop();
+}
+
+/* ---------- Translation (MyMemory, free, no key) ----------
+   Clusters queue through here so requests stay spaced out and
+   repeated phrases hit the cache. On any failure the original
+   words appear untranslated, so speech is never swallowed.  */
+const tCache = new Map();
+const tQueue = [];
+let tBusy = false;
+
+function sourceLangForTranslation() {
+  return CONFIG.language === 'auto' ? 'en' : CONFIG.language.split('-')[0];
+}
+
+function queueTranslate(phrase) {
+  tQueue.push(phrase);
+  pumpTranslate();
+}
+
+async function pumpTranslate() {
+  if (tBusy || tQueue.length === 0) return;
+  tBusy = true;
+  const phrase = tQueue.shift();
+  const src = sourceLangForTranslation(), tgt = CONFIG.targetLang;
+  const key = src + '|' + tgt + '|' + phrase.toLowerCase();
+
+  if (src === tgt) { spawnCluster(phrase, null); }
+  else if (tCache.has(key)) { spawnWithTranslation(phrase, tCache.get(key)); }
+  else {
+    try {
+      const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(phrase)
+                + '&langpair=' + src + '|' + tgt;
+      const res = await fetch(url);
+      const json = await res.json();
+      const trans = json && json.responseData && json.responseData.translatedText
+        ? json.responseData.translatedText.trim() : null;
+      if (trans) tCache.set(key, trans);
+      spawnWithTranslation(phrase, trans);
+    } catch (err) {
+      spawnCluster(phrase, null); // offline or rate-limited: show the original
+    }
+  }
+  setTimeout(() => { tBusy = false; pumpTranslate(); }, 350);
+}
+
+function spawnWithTranslation(phrase, trans) {
+  if (!trans) { spawnCluster(phrase, null); return; }
+  if (CONFIG.translateDisplay === 'translated') spawnCluster(trans, null);
+  else spawnCluster(phrase, trans);
+}
+
+/* ---------- Spawning ---------- */
+function spawnCluster(phrase, sub) {
+  lastVoiceMs = millis();
+
+  if (CONFIG.liveLayout === 'subtitles') {
+    const rowText = sub ? phrase + '  ·  ' + sub : phrase;
+    const last = subtitleRows[subtitleRows.length - 1];
+    if (last && !sub && !last.sub && millis() - last.birth < 3500 && (last.text + ' ' + phrase).length < 46) {
+      last.text += ' ' + phrase;
+    } else {
+      subtitleRows.push({ text: rowText, sub: !!sub, birth: millis() });
+    }
+    return;
+  }
+
+  const m = CONFIG.margin;
+  ghosts.push({
+    text: phrase,
+    sub: sub || null,
+    x: random(m, width - m),
+    y: random(m, height - m),
+    vx: random(-1, 1), vy: random(-1, 1) * 0.6 - 0.15,
+    size: DEFAULTS.baseSize * random(1 - CONFIG.sizeVariation, 1 + CONFIG.sizeVariation),
+    ampBoost: 1 + CONFIG.reactSize * Math.min(amp * 9, 1.6),
+    rot: radians(random(-1, 1) * CONFIG.maxRotationDeg),
+    seed: random(1000),
+    font: CONFIG.font,
+    entry: CONFIG.entryStyle,
+    exit: CONFIG.exitStyle,
+    birth: millis()
+  });
+}
+
+function emitNewWords(newWords) {
+  if (CONFIG.appMode !== 'live') return; // manual mode is driven by the arrow keys, not the mic
+  const clean = newWords.filter(w => w && !/^[\[\(♪].*|.*[\]\)♪]$/.test(w));
+  for (let i = 0; i < clean.length; i += CONFIG.maxWordsPerCluster) {
+    const phrase = clean.slice(i, i + CONFIG.maxWordsPerCluster).join(' ');
+    if (CONFIG.translateMode === 'mymemory') queueTranslate(phrase);
+    else spawnCluster(phrase, null); // whisper-en arrives already translated
+  }
+}
+
+/* ============================================================
+   MICROPHONE (shared by all engines, drives voice reactivity)
+   ============================================================ */
+async function ensureMic() {
+  if (micStream) return true;
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (err) {
+    setStatus(false, 'microphone permission denied');
+    return false;
+  }
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const src = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  src.connect(analyser);
+
+  procNode = audioCtx.createScriptProcessor(4096, 1, 1);
+  src.connect(procNode);
+  procNode.connect(audioCtx.destination); // required for the processor to fire; it outputs silence
+  procNode.onaudioprocess = onAudioChunk;
+  return true;
+}
+
+function onAudioChunk(e) {
+  const data = e.inputBuffer.getChannelData(0);
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) sum += data[i] * data[i];
+  const rms = Math.sqrt(sum / (data.length / 4));
+  amp = lerp(amp, rms, 0.25);
+  if (rms > CONFIG.voiceThreshold) lastVoiceMs = millis();
+
+  if (CONFIG.engine === 'webspeech' || !began || CONFIG.appMode !== 'live') return;
+
+  // Collect audio for the Whisper engines
+  if (chunkBuf.length === 0) chunkStartMs = millis();
+  chunkBuf.push(new Float32Array(data));
+  if (rms > CONFIG.voiceThreshold) { chunkHasVoice = true; lastChunkVoiceMs = millis(); }
+
+  const dur = (millis() - chunkStartMs) / 1000;
+  const gap = millis() - lastChunkVoiceMs;
+
+  if (chunkHasVoice && (dur >= CONFIG.whisperChunkSec || (gap > CONFIG.whisperGapMs && dur > 0.8))) {
+    flushChunk();
+  } else if (!chunkHasVoice && dur > 5) {
+    chunkBuf = []; // pure silence, discard
+  }
+}
+
+function flushChunk() {
+  const total = chunkBuf.reduce((n, b) => n + b.length, 0);
+  const audio = new Float32Array(total);
+  let off = 0;
+  for (const b of chunkBuf) { audio.set(b, off); off += b.length; }
+  chunkBuf = []; chunkHasVoice = false;
+  const sr = audioCtx.sampleRate;
+  if (CONFIG.engine === 'whisper-browser') transcribeBrowser(audio, sr);
+  else if (CONFIG.engine === 'whisper-server') transcribeServer(audio, sr);
+}
+
+/* Resample to 16 kHz if the context refused that rate */
+function to16k(audio, sr) {
+  if (sr === 16000) return audio;
+  const ratio = sr / 16000;
+  const out = new Float32Array(Math.floor(audio.length / ratio));
+  for (let i = 0; i < out.length; i++) out[i] = audio[Math.floor(i * ratio)];
+  return out;
+}
+
+function whisperLang() {
+  return CONFIG.language === 'auto' ? null : CONFIG.language.split('-')[0];
+}
+
+/* ============================================================
+   ENGINE 1 — Web Speech API
+   ============================================================ */
+function startWebSpeech() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { setStatus(false, 'Web Speech unavailable here — use Chrome, or switch engine'); return; }
+  stopWebSpeech();
+  recognition = new SR();
+  recognition.lang = CONFIG.language === 'auto' ? 'en-IN' : CONFIG.language;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  interimWordCount = 0;
+
+  recognition.onstart = () => setStatus(true, 'listening · Web Speech · ' + recognition.lang);
+  recognition.onresult = (event) => {
+    let interim = '', sawFinal = false;
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) sawFinal = true;
+      interim += event.results[i][0].transcript + ' ';
+    }
+    const words = interim.trim().split(/\s+/).filter(Boolean);
+    if (words.length > interimWordCount) {
+      emitNewWords(words.slice(interimWordCount));
+      interimWordCount = words.length;
+    }
+    if (sawFinal) interimWordCount = 0;
+  };
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') setStatus(false, 'microphone permission denied');
+    else if (e.error === 'network') setStatus(false, 'network error — Web Speech needs internet; try a Whisper engine');
+  };
+  recognition.onend = () => {
+    if (!began || CONFIG.engine !== 'webspeech' || CONFIG.appMode !== 'live') return;
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => { if (began && CONFIG.engine === 'webspeech') startWebSpeech(); }, 400);
+  };
+  try { recognition.start(); } catch (err) {}
+}
+
+function stopWebSpeech() {
+  clearTimeout(restartTimer);
+  if (recognition) {
+    recognition.onend = null;
+    try { recognition.stop(); } catch (err) {}
+    recognition = null;
+  }
+}
+
+/* ============================================================
+   ENGINE 2 — Whisper in the browser (transformers.js)
+   ============================================================ */
+function dlShow(text, pct) {
+  const el = $('dl');
+  el.classList.add('show');
+  el.classList.remove('ready');
+  $('dlText').textContent = text;
+  $('dlFill').style.width = (pct || 0) + '%';
+}
+function dlReady() {
+  const el = $('dl');
+  el.classList.add('show', 'ready');
+  $('dlText').textContent = 'Whisper ready — listening offline';
+  $('dlFill').style.width = '100%';
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+function dlHide() { $('dl').classList.remove('show'); }
+
+async function loadWhisper() {
+  if (whisperPipe || whisperLoading) return;
+  whisperLoading = true;
+  dlShow('Loading Whisper model…', 0);
+  setStatus(false, 'loading Whisper model…');
+  try {
+    const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.1/+esm');
+    // Weighted progress across the model's files
+    const fileProg = {};
+    const progress = d => {
+      if (d.status === 'progress' && d.file) {
+        fileProg[d.file] = { loaded: d.loaded || 0, total: d.total || 0 };
+        let loaded = 0, total = 0;
+        for (const f of Object.values(fileProg)) { loaded += f.loaded; total += f.total; }
+        if (total > 0) {
+          const pct = Math.round((loaded / total) * 100);
+          dlShow(`Downloading Whisper model · ${pct}%`, pct);
+        }
+      }
+      if (d.status === 'ready') dlShow('Warming up…', 100);
+    };
+    try {
+      whisperPipe = await pipeline('automatic-speech-recognition', CONFIG.whisperModel,
+        { device: 'webgpu', dtype: 'fp32', progress_callback: progress });
+    } catch (gpuErr) {
+      dlShow('WebGPU unavailable, using CPU…', 50);
+      whisperPipe = await pipeline('automatic-speech-recognition', CONFIG.whisperModel,
+        { progress_callback: progress });
+    }
+    dlReady();
+    setStatus(true, 'listening · Whisper (browser) · ' + (CONFIG.language === 'auto' ? 'auto-detect' : CONFIG.language));
+  } catch (err) {
+    dlHide();
+    setStatus(false, 'could not load Whisper — check internet for the first download');
+    whisperPipe = null;
+  }
+  whisperLoading = false;
+}
+
+async function transcribeBrowser(audio, sr) {
+  if (!whisperPipe || whisperBusy) return;
+  whisperBusy = true;
+  try {
+    const opts = { task: CONFIG.translateMode === 'whisper-en' ? 'translate' : 'transcribe' };
+    const lang = whisperLang();
+    if (lang) opts.language = lang;
+    const out = await whisperPipe(to16k(audio, sr), opts);
+    if (out && out.text) emitNewWords(out.text.trim().split(/\s+/));
+  } catch (err) {
+    setStatus(false, 'Whisper transcription error — see console');
+  }
+  whisperBusy = false;
+}
+
+/* ============================================================
+   ENGINE 3 — Whisper local server (whisper.cpp or compatible)
+   ============================================================ */
+function encodeWav(audio, sr) {
+  const a16 = to16k(audio, sr);
+  const buf = new ArrayBuffer(44 + a16.length * 2);
+  const v = new DataView(buf);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, 'RIFF'); v.setUint32(4, 36 + a16.length * 2, true); wstr(8, 'WAVE');
+  wstr(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  wstr(36, 'data'); v.setUint32(40, a16.length * 2, true);
+  for (let i = 0; i < a16.length; i++) {
+    const s = Math.max(-1, Math.min(1, a16[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+async function transcribeServer(audio, sr) {
+  if (whisperBusy) return;
+  whisperBusy = true;
+  try {
+    const form = new FormData();
+    form.append('file', encodeWav(audio, sr), 'chunk.wav');
+    const lang = whisperLang();
+    if (lang) form.append('language', lang);
+    if (CONFIG.translateMode === 'whisper-en') form.append('translate', 'true');
+    const res = await fetch(CONFIG.serverUrl, { method: 'POST', body: form });
+    if (!res.ok) {
+      setStatus(false, res.status === 404
+        ? 'server replied 404 — check the endpoint path in settings'
+        : 'server error ' + res.status);
+    } else {
+      const json = await res.json();
+      const txt = json.text || json.transcription || '';
+      if (txt.trim()) emitNewWords(txt.trim().split(/\s+/));
+      setStatus(true, 'listening · Whisper server');
+    }
+  } catch (err) {
+    setStatus(false, 'cannot reach the Whisper server — is it running at the URL in settings?');
+  }
+  whisperBusy = false;
+}
+
+/* ============================================================
+   ENGINE SWITCHING
+   ============================================================ */
+async function startEngine() {
+  stopWebSpeech();
+  chunkBuf = []; chunkHasVoice = false;
+  if (!began || CONFIG.appMode !== 'live') return;
+  const ok = await ensureMic();
+  if (!ok) return;
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+  if (CONFIG.engine === 'webspeech') {
+    startWebSpeech();
+  } else if (CONFIG.engine === 'whisper-browser') {
+    await loadWhisper();
+  } else {
+    setStatus(true, 'listening · Whisper server');
+  }
+}
+
+function setStatus(live, msg) {
+  $('statusDot').classList.toggle('live', live);
+  $('statusText').textContent = msg;
+}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+const BINDINGS = [
+  { id: 'langSel',      key: 'language',           kind: 'select', after: () => { updateTranslateVisibility(); if (CONFIG.engine === 'webspeech') startEngine(); } },
+  { id: 'modeSel',      key: 'liveLayout',         kind: 'select', after: updatePanelVisibility },
+  { id: 'importSel',    key: 'importMode',         kind: 'select', after: () => { if (scriptDoc) rebuildCues(); } },
+  { id: 'animPaceSel',  key: 'animPace',           kind: 'range', valId: 'animPaceVal' },
+  { id: 'animLoopSel',  key: 'animLoop',           kind: 'select' },
+  { id: 'cueTransSel',  key: 'cueTranslate',       kind: 'select', after: () => { updateCueTransVisibility(); prefetchTranslations(); boundsCacheKey = ''; } },
+  { id: 'cueTargetSel', key: 'cueTargetLang',      kind: 'select', after: () => { prefetchTranslations(); boundsCacheKey = ''; } },
+  { id: 'cueTDisplaySel', key: 'cueTransDisplay',  kind: 'select', after: () => { boundsCacheKey = ''; } },
+  { id: 'cueWordsSel',  key: 'maxWordsPerCue',     kind: 'range', valId: 'cueWordsVal' },
+  { id: 'safeSel',      key: 'showSafeArea',       kind: 'select' },
+  { id: 'namesSel',     key: 'showCharNames',      kind: 'select' },
+  { id: 'fontSel',      key: 'font',               kind: 'select' },
+  { id: 'entrySel',     key: 'entryStyle',         kind: 'select' },
+  { id: 'exitSel',      key: 'exitStyle',          kind: 'select' },
+  { id: 'fieldSel',     key: 'motionField',        kind: 'select' },
+  { id: 'translateSel', key: 'translateMode',      kind: 'select', after: updateTranslateVisibility },
+  { id: 'targetSel',    key: 'targetLang',         kind: 'select' },
+  { id: 'tDisplaySel',  key: 'translateDisplay',   kind: 'select' },
+  { id: 'colorSel',     key: 'textColor',          kind: 'color'  },
+  { id: 'bgSel',        key: 'bgColor',            kind: 'color'  },
+  { id: 'serverUrl',    key: 'serverUrl',          kind: 'text'   },
+  { id: 'clusterSel',   key: 'maxWordsPerCluster', kind: 'range', valId: 'clusterVal' },
+  { id: 'sizeSel',      key: 'baseSize',           kind: 'range', valId: 'sizeVal' },
+  { id: 'sizeVarSel',   key: 'sizeVariation',      kind: 'range', valId: 'sizeVarVal' },
+  { id: 'rotSel',       key: 'maxRotationDeg',     kind: 'range', valId: 'rotVal' },
+  { id: 'glowSel',      key: 'glow',               kind: 'range', valId: 'glowVal' },
+  { id: 'trailsSel',    key: 'trails',             kind: 'range', valId: 'trailsVal' },
+  { id: 'dimSel',       key: 'silenceDim',         kind: 'range', valId: 'dimVal' },
+  { id: 'fadeInSel',    key: 'fadeInSec',          kind: 'range', valId: 'fadeInVal' },
+  { id: 'holdSel',      key: 'holdSec',            kind: 'range', valId: 'holdVal' },
+  { id: 'fadeOutSel',   key: 'fadeOutSec',         kind: 'range', valId: 'fadeOutVal' },
+  { id: 'speedSel',     key: 'driftSpeed',         kind: 'range', valId: 'speedVal' },
+  { id: 'trembleSel',   key: 'tremble',            kind: 'range', valId: 'trembleVal' },
+  { id: 'flickerSel',   key: 'flickerAmount',      kind: 'range', valId: 'flickerVal' },
+  { id: 'echoSel',      key: 'echo',               kind: 'range', valId: 'echoVal' },
+  { id: 'splitSel',     key: 'rgbSplit',           kind: 'range', valId: 'splitVal' },
+  { id: 'breathSel',    key: 'breathGlow',         kind: 'range', valId: 'breathVal' },
+  { id: 'reactSizeSel', key: 'reactSize',          kind: 'range', valId: 'reactSizeVal' },
+  { id: 'reactGlowSel', key: 'reactGlow',          kind: 'range', valId: 'reactGlowVal' }
+];
+
+function wireBindings() {
+  for (const b of BINDINGS) {
+    const el = $(b.id);
+    const ev = (b.kind === 'select') ? 'change' : 'input';
+    el.addEventListener(ev, e => {
+      CONFIG[b.key] = (b.kind === 'range') ? +e.target.value : e.target.value;
+      if (b.valId) $(b.valId).textContent = e.target.value;
+      if (b.after) b.after();
+    });
+  }
+  $('engineSel').addEventListener('change', e => {
+    CONFIG.engine = e.target.value;
+    updateEngineVisibility();
+    startEngine();
+  });
+  $('modelSel').addEventListener('change', e => {
+    CONFIG.whisperModel = e.target.value;
+    whisperPipe = null;
+    if (CONFIG.engine === 'whisper-browser') startEngine();
+  });
+}
+
+/* ============================================================
+   TEXT ANIMATION — typed text plays out like live speech
+   ============================================================ */
+function tickAnim(now) {
+  if (!animPlaying || !animWords.length) return;
+  if (now < animNextAt) return;
+  // a comma ends the apparition early, so comma-separated phrases
+  // appear as their own ghosts instead of being grouped across the pause
+  const chunk = [];
+  while (chunk.length < CONFIG.maxWordsPerCluster && animPos + chunk.length < animWords.length) {
+    const w = animWords[animPos + chunk.length];
+    chunk.push(w);
+    if (/[,،、]$/.test(w)) break;
+  }
+  if (chunk.length) {
+    spawnCluster(chunk.join(' '), null);
+    animPos += chunk.length;
+    animNextAt = now + (chunk.length / CONFIG.animPace) * 1000;
+    updateAnimInfo();
+  } else if (CONFIG.animLoop === 'on') {
+    animPos = 0;
+    animNextAt = now + 800;
+  } else {
+    animPlaying = false;
+    updateAnimPlayBtn();
+    setStatus(true, 'text finished — restart to play again');
+  }
+}
+
+function readAnimText() {
+  animWords = $('animText').value.split(/\s+/).filter(Boolean);
+  if (animPos > animWords.length) animPos = 0;
+  updateAnimInfo();
+}
+function updateAnimInfo() {
+  $('animInfo').textContent = animWords.length
+    ? `word ${Math.min(animPos, animWords.length)} / ${animWords.length}`
+    : 'no text yet';
+}
+function updateAnimPlayBtn() {
+  $('animPlayBtn').textContent = animPlaying ? 'pause' : 'play';
+}
+
+$('animText').addEventListener('input', readAnimText);
+$('animPlayBtn').addEventListener('click', () => {
+  readAnimText();
+  if (!animWords.length) { setStatus(false, 'paste some text first'); return; }
+  animPlaying = !animPlaying;
+  if (animPlaying) { animNextAt = 0; setStatus(true, 'playing'); }
+  updateAnimPlayBtn();
+});
+$('animRestartBtn').addEventListener('click', () => {
+  readAnimText();
+  animPos = 0; ghosts = []; subtitleRows = []; particles = [];
+  drawBackground(true);
+  animPlaying = animWords.length > 0;
+  animNextAt = 0;
+  updateAnimPlayBtn(); updateAnimInfo();
+});
+
+/* ============================================================
+   CANVAS RECORDING — captures the sketch to a .webm video
+   ============================================================ */
+function recTick() {
+  const sec = Math.floor((millis() - recStartMs) / 1000);
+  $('recBtn').textContent = `stop ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+$('recBtn').addEventListener('click', () => {
+  if (recorder) {
+    recorder.stop();
+    return;
+  }
+  const cnv = document.querySelector('canvas');
+  if (!cnv || !cnv.captureStream) { setStatus(false, 'recording is not supported in this browser'); return; }
+  const stream = cnv.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9' : 'video/webm';
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+  recChunks = [];
+  recorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+  recorder.onstop = () => {
+    clearInterval(recTimer);
+    const blob = new Blob(recChunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'textplot-recording.webm';
+    a.click();
+    recorder = null;
+    $('recBtn').textContent = 'record';
+    $('recBtn').classList.remove('rec');
+    setStatus(true, 'recording saved as .webm');
+  };
+  recorder.start(1000);
+  recStartMs = millis();
+  $('recBtn').classList.add('rec');
+  recTimer = setInterval(recTick, 500);
+  recTick();
+  setStatus(true, 'recording the canvas…');
+});
+
+/* ---------- Mode tabs & conditional panel sections ---------- */
+function updatePanelVisibility() {
+  const m = CONFIG.appMode;
+  const live = m === 'live', anim = m === 'anim', manual = m === 'manual';
+  const spawnish = live || anim;
+  const floating = spawnish && CONFIG.liveLayout === 'floating';
+  document.querySelectorAll('.sec-live').forEach(el => el.classList.toggle('hidden', !live));
+  document.querySelectorAll('.sec-anim').forEach(el => el.classList.toggle('hidden', !anim));
+  document.querySelectorAll('.sec-manual').forEach(el => el.classList.toggle('hidden', !manual));
+  document.querySelectorAll('.sec-spawn').forEach(el => el.classList.toggle('hidden', !spawnish));
+  document.querySelectorAll('.sec-floating').forEach(el => el.classList.toggle('hidden', !floating));
+  document.querySelectorAll('.sec-voicereact').forEach(el => el.classList.toggle('hidden', !(live && floating)));
+  $('tabLive').classList.toggle('active', live);
+  $('tabAnim').classList.toggle('active', anim);
+  $('tabManual').classList.toggle('active', manual);
+  $('cuesBtn').classList.toggle('hidden', !manual);
+  updateCueTransVisibility();
+  $('tabHint').textContent = live
+    ? 'the mic listens and text appears as it is spoken.'
+    : anim
+      ? 'typed text plays out word by word, styled like the live apparitions.'
+      : 'you trigger prepared cues by hand — surtitle style.';
+  $('modeHint').textContent = CONFIG.liveLayout === 'floating'
+    ? 'words drift as apparitions across the canvas.'
+    : 'lines gather at the bottom of the screen.';
+}
+
+function setAppMode(m) {
+  CONFIG.appMode = m;
+  updatePanelVisibility();
+  if (m === 'manual') {
+    stopWebSpeech();
+    toggleDrawer(true);
+    setStatus(true, cues.length
+      ? `manual · ${cues.length} cues · ↑ ↓ to trigger`
+      : 'manual — upload a script or add cues by hand');
+  } else if (m === 'anim') {
+    stopWebSpeech();
+    toggleDrawer(false);
+    animPlaying = false;
+    updateAnimPlayBtn(); updateAnimInfo();
+    setStatus(true, animWords.length ? 'text animation — press play' : 'text animation — paste text in settings');
+  } else {
+    toggleDrawer(false);
+    if (began) startEngine();
+  }
+}
+$('tabLive').addEventListener('click', () => setAppMode('live'));
+$('tabAnim').addEventListener('click', () => setAppMode('anim'));
+$('tabManual').addEventListener('click', () => setAppMode('manual'));
+$('cueEditBtn').addEventListener('click', () => toggleDrawer(true));
+
+function updateEngineVisibility() {
+  $('whisperModelWrap').classList.toggle('hidden', CONFIG.engine !== 'whisper-browser');
+  $('serverWrap').classList.toggle('hidden', CONFIG.engine !== 'whisper-server');
+  updateTranslateVisibility();
+}
+
+function updateTranslateVisibility() {
+  $('targetWrap').classList.toggle('hidden', CONFIG.translateMode !== 'mymemory');
+  const hint = $('translateHint');
+  if (CONFIG.translateMode === 'mymemory') {
+    hint.textContent = CONFIG.language === 'auto'
+      ? 'Online translation needs a fixed source language — pick one above, auto-detect will assume English.'
+      : 'Free online translation, no key needed. Words appear a beat after they are spoken.';
+  } else if (CONFIG.translateMode === 'whisper-en') {
+    hint.textContent = CONFIG.engine === 'webspeech'
+      ? 'This mode needs one of the Whisper engines.'
+      : 'Whisper translates any language into English as it transcribes, fully offline.';
+  } else {
+    hint.textContent = '';
+  }
+}
+
+function syncPanelFromConfig() {
+  for (const b of BINDINGS) {
+    $(b.id).value = CONFIG[b.key];
+    if (b.valId) $(b.valId).textContent = CONFIG[b.key];
+  }
+  $('engineSel').value = CONFIG.engine;
+  $('modelSel').value = CONFIG.whisperModel;
+  updateEngineVisibility();
+  updatePanelVisibility();
+}
+
+/* ---------- Suite chrome: about, footer, canvas buttons ---------- */
+$('footerCredit').innerHTML =
+  '<a href="https://gauravnijjer.com" target="_blank" rel="noopener">' + CONFIG.footerText + '</a>';
+
+$('aboutPop').innerHTML =
+  '<h3>TEXT<span style="color:#777">PLOT</span></h3>' +
+  '<div class="txt"></div>' +
+  '<div class="btnrow"><button id="aboutClose">close</button></div>';
+$('aboutPop').querySelector('.txt').textContent = CONFIG.aboutText;
+$('aboutBtn').addEventListener('click', () => {
+  const pop = $('aboutPop');
+  pop.style.display = pop.style.display === 'block' ? 'none' : 'block';
+});
+$('aboutPop').addEventListener('click', e => {
+  if (e.target.id === 'aboutClose') $('aboutPop').style.display = 'none';
+});
+
+function togglePanel() {
+  panelOpen = !panelOpen;
+  $('panel').classList.toggle('open', panelOpen);
+}
+$('settingsBtn').addEventListener('click', togglePanel);
+
+/* ---------- Begin, reset, keyboard ---------- */
+$('beginLiveBtn').addEventListener('click', () => {
+  began = true;
+  lastVoiceMs = millis();
+  $('beginOverlay').style.display = 'none';
+  setAppMode('live');
+});
+
+$('beginAnimBtn').addEventListener('click', () => {
+  began = true;
+  lastVoiceMs = millis();
+  $('beginOverlay').style.display = 'none';
+  setAppMode('anim');
+  if (!panelOpen) togglePanel(); // land the person on the text box
+});
+
+$('beginManualBtn').addEventListener('click', () => {
+  began = true;
+  lastVoiceMs = millis();
+  $('beginOverlay').style.display = 'none';
+  setAppMode('manual');
+  if (!panelOpen) togglePanel(); // land the person on the script upload
+});
+
+$('resetBtn').addEventListener('click', () => {
+  const keepMode = CONFIG.appMode; // reset the look, not which mode you're working in
+  Object.assign(CONFIG, JSON.parse(JSON.stringify(DEFAULTS)));
+  CONFIG.appMode = keepMode;
+  syncPanelFromConfig();
+  drawBackground(true);
+  startEngine();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { $('aboutPop').style.display = 'none'; return; }
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  if (e.key === 's' || e.key === 'S') togglePanel();
+  if (e.key === 'c' || e.key === 'C') { if (CONFIG.appMode === 'manual') toggleDrawer(); }
+  if (CONFIG.appMode === 'manual') {
+    if (e.key === 'ArrowDown') { e.preventDefault(); stepCue(1); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); stepCue(-1); }
+  }
+});
+
+wireBindings();
+syncPanelFromConfig();
+</script>
+</body>
+</html>
