@@ -277,8 +277,22 @@
     <select id="modeSel">
       <option value="floating">Floating apparitions</option>
       <option value="subtitles">Subtitles (organised)</option>
+      <option value="typefill">Typed page (fills the screen)</option>
     </select>
     <p class="subhint" id="modeHint"></p>
+
+    <div id="typefillWrap" class="hidden">
+      <label>Typing starts from</label>
+      <select id="typeCornerSel">
+        <option value="tl">Top left corner</option>
+        <option value="tr">Top right corner</option>
+        <option value="bl">Bottom left corner</option>
+        <option value="br">Bottom right corner</option>
+      </select>
+
+      <label>Typing speed (chars / second) <span class="val" id="typeSpeedVal"></span></label>
+      <input type="range" id="typeSpeedSel" min="4" max="60" step="1">
+    </div>
 
     <label>Words per apparition <span class="val" id="clusterVal"></span></label>
     <input type="range" id="clusterSel" min="1" max="6" step="1">
@@ -320,18 +334,52 @@
     <label>Language</label>
     <select id="langSel">
       <option value="auto">Auto-detect (Whisper only)</option>
-      <option value="en-IN">English (India)</option>
-      <option value="en-US">English (US)</option>
-      <option value="hi-IN">Hindi</option>
-      <option value="bn-IN">Bengali</option>
-      <option value="ta-IN">Tamil</option>
-      <option value="te-IN">Telugu</option>
-      <option value="mr-IN">Marathi</option>
-      <option value="gu-IN">Gujarati</option>
-      <option value="kn-IN">Kannada</option>
-      <option value="ml-IN">Malayalam</option>
-      <option value="pa-IN">Punjabi</option>
-      <option value="ur-IN">Urdu</option>
+      <optgroup label="Indian languages">
+        <option value="en-IN">English (India)</option>
+        <option value="hi-IN">Hindi</option>
+        <option value="bn-IN">Bengali</option>
+        <option value="ta-IN">Tamil</option>
+        <option value="te-IN">Telugu</option>
+        <option value="mr-IN">Marathi</option>
+        <option value="gu-IN">Gujarati</option>
+        <option value="kn-IN">Kannada</option>
+        <option value="ml-IN">Malayalam</option>
+        <option value="pa-IN">Punjabi</option>
+        <option value="ur-IN">Urdu</option>
+        <option value="ne-NP">Nepali</option>
+        <option value="si-LK">Sinhala</option>
+      </optgroup>
+      <optgroup label="World languages">
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+        <option value="es-ES">Spanish (Spain)</option>
+        <option value="es-MX">Spanish (Mexico)</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="it-IT">Italian</option>
+        <option value="pt-BR">Portuguese (Brazil)</option>
+        <option value="pt-PT">Portuguese (Portugal)</option>
+        <option value="nl-NL">Dutch</option>
+        <option value="ru-RU">Russian</option>
+        <option value="pl-PL">Polish</option>
+        <option value="sv-SE">Swedish</option>
+        <option value="el-GR">Greek</option>
+        <option value="tr-TR">Turkish</option>
+        <option value="ar-SA">Arabic</option>
+        <option value="he-IL">Hebrew</option>
+        <option value="fa-IR">Persian</option>
+        <option value="ja-JP">Japanese</option>
+        <option value="ko-KR">Korean</option>
+        <option value="zh-CN">Chinese (Mandarin, simplified)</option>
+        <option value="zh-TW">Chinese (Mandarin, traditional)</option>
+        <option value="yue-Hant-HK">Cantonese</option>
+        <option value="th-TH">Thai</option>
+        <option value="vi-VN">Vietnamese</option>
+        <option value="id-ID">Indonesian</option>
+        <option value="ms-MY">Malay</option>
+        <option value="fil-PH">Filipino</option>
+        <option value="sw-KE">Swahili</option>
+      </optgroup>
     </select>
 
     <div id="whisperModelWrap" class="hidden">
@@ -570,6 +618,10 @@
       <option value="rise">Rise like smoke</option>
       <option value="rain">Fall like rain</option>
       <option value="flow">Flow field (wander)</option>
+      <option value="recede">Recede into depth</option>
+      <option value="approach">Approach from depth</option>
+      <option value="ltr">Stream left → right</option>
+      <option value="rtl">Stream right → left</option>
       <option value="still">Still</option>
     </select>
 
@@ -650,6 +702,10 @@ three modes
   as subtitles.
 · text — paste any text and it plays out word by
   word with the same looks as the live mode.
+  layouts: floating apparitions, subtitles, or a
+  typed page filling the screen from a chosen
+  corner. movement includes depth (receding or
+  approaching) and left / right streams.
 · manual — upload a script, edit the auto-split
   cues, and trigger each one by hand. surtitle style.
 
@@ -707,6 +763,10 @@ gauravnijjer.com`,
   targetLang: 'en',               // MyMemory target
   translateDisplay: 'both',       // 'both' | 'translated'
 
+  // Typed page layout
+  typeCorner: 'tl',               // tl | tr | bl | br — where typing begins
+  typeSpeed: 18,                  // characters per second
+
   // Text animation
   animPace: 2,                    // words per second
   animLoop: 'off',
@@ -743,7 +803,7 @@ gauravnijjer.com`,
   fadeOutSec: 5.0,
 
   // Motion
-  motionField: 'drift',           // drift | rise | rain | flow | still
+  motionField: 'drift',           // drift | rise | rain | flow | recede | approach | ltr | rtl | still
   driftSpeed: 0.25,
   tremble: 0.1,
   flickerAmount: 0.1,
@@ -799,6 +859,7 @@ let cueIndex = -1, cueChangedAt = 0, drawerOpen = false, cueVisible = true;
 let boundsCacheKey = '', boundsCache = null;
 
 let animWords = [], animPos = 0, animPlaying = false, animNextAt = 0;
+let typeTarget = '', typeShown = 0, typePageStart = 0, typeWrapKey = '', typeWrapCache = [];
 let recorder = null, recChunks = [], recStartMs = 0, recTimer = null;
 
 const $ = id => document.getElementById(id);
@@ -826,6 +887,8 @@ function draw() {
     for (let i = ghosts.length - 1; i >= 0; i--) {
       if (!renderGhost(ghosts[i], now)) ghosts.splice(i, 1);
     }
+  } else if (CONFIG.liveLayout === 'typefill') {
+    drawTypeFill(now);
   } else {
     drawSubtitles(now);
   }
@@ -914,6 +977,9 @@ function updateMotion(g, now) {
       const a = noise(g.x * 0.0015, g.y * 0.0015, now * 0.00008) * TWO_PI * 2;
       vx = Math.cos(a) * s * 1.4; vy = Math.sin(a) * s * 1.4; break;
     }
+    case 'ltr': vx = Math.max(s, 0.15) * 2.4; vy = 0.2 * s * Math.sin(now * 0.0006 + g.seed); break;
+    case 'rtl': vx = -Math.max(s, 0.15) * 2.4; vy = 0.2 * s * Math.sin(now * 0.0006 + g.seed); break;
+    case 'recede': case 'approach': return; // depth position is computed in renderGhost
     case 'still': break;
   }
   g.x += vx; g.y += vy;
@@ -938,6 +1004,32 @@ function renderGhost(g, now) {
   if (g.entry === 'blur' && ph.pIn < 1) blurPx = (1 - easeOut(ph.pIn)) * 8;
   if (g.entry === 'grow') scaleF *= lerp(0.15, 1, easeOut(ph.pIn));
   if (g.entry === 'collapse') scaleF *= lerp(2.6, 1, easeOut(ph.pIn));
+
+  // Depth fields: scale, brightness, and position track a point moving
+  // along the z axis. Recede starts large at the spawn point and sinks
+  // toward the centre; approach is born small near the centre, swells
+  // past the camera along its radial line, and blurs out of frame.
+  let depthDim = 1;
+  if (CONFIG.motionField === 'recede' || CONFIG.motionField === 'approach') {
+    if (g.x0 === undefined) { g.x0 = g.x; g.y0 = g.y; }
+    const T = (CONFIG.fadeInSec + CONFIG.holdSec + CONFIG.fadeOutSec) * 1000;
+    const p = constrain(age / T, 0, 1);
+    const cx = width / 2, cy = height / 2;
+    if (CONFIG.motionField === 'recede') {
+      scaleF *= lerp(1.7, 0.2, easeOut(p));
+      depthDim = lerp(1, 0.4, p);
+      const k = lerp(1, 0.3, easeOut(p));
+      g.x = cx + (g.x0 - cx) * k;
+      g.y = cy + (g.y0 - cy) * k;
+    } else {
+      const pe = p * p;
+      scaleF *= lerp(0.15, 3.6, pe);
+      const k = lerp(0.18, 1.5, pe);
+      g.x = cx + (g.x0 - cx) * k;
+      g.y = cy + (g.y0 - cy) * k;
+      if (p > 0.78) blurPx = Math.max(blurPx, (p - 0.78) / 0.22 * 9);
+    }
+  }
 
   // Exit styles
   if (g.exit === 'blur' && ph.pOut > 0) blurPx = Math.max(blurPx, ph.pOut * 10);
@@ -970,7 +1062,7 @@ function renderGhost(g, now) {
   ctx.shadowColor = CONFIG.textColor;
 
   const base = color(CONFIG.textColor);
-  const a255 = 255 * alpha * flick;
+  const a255 = 255 * alpha * flick * depthDim;
 
   if (CONFIG.rgbSplit > 0) {
     ghostContent(g, ph, color(255, 70, 70), a255 * 0.55, -CONFIG.rgbSplit, 0);
@@ -1046,6 +1138,77 @@ function renderParticles(now) {
     fill(red(col), green(col), blue(col), 200 * (1 - t));
     circle(p.x, p.y, p.r);
   }
+  pop();
+}
+
+/* ---------- Typed page ----------
+   Spoken or played words are typed out character by character
+   from a chosen corner, wrapping and filling the screen. When a
+   page is full it clears and typing continues fresh. Bottom
+   corners grow upwards, right corners align right. */
+function resetTypeFill() {
+  typeTarget = ''; typeShown = 0; typePageStart = 0; typeWrapKey = ''; typeWrapCache = [];
+}
+
+function wrapPlain(str, bw) {
+  const words = str.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (textWidth(test) <= bw || !line) line = test;
+    else { lines.push(line); line = w; }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawTypeFill(now) {
+  if (typeShown < typeTarget.length) {
+    typeShown = Math.min(typeTarget.length, typeShown + CONFIG.typeSpeed * (deltaTime / 1000));
+  }
+  const shown = typeTarget.slice(typePageStart, Math.floor(typeShown));
+  if (!shown) return;
+
+  const m = Math.max(40, width * 0.05);
+  const bw = width - 2 * m;
+  const leading = CONFIG.baseSize * 1.45;
+  const ctx = drawingContext;
+
+  push();
+  textFont(CONFIG.font);
+  textSize(CONFIG.baseSize);
+  textStyle('normal');
+
+  const key = [Math.floor(typeShown), typePageStart, CONFIG.font, CONFIG.baseSize, bw].join('|');
+  if (key !== typeWrapKey) { typeWrapCache = wrapPlain(shown, bw); typeWrapKey = key; }
+  let lines = typeWrapCache;
+
+  const maxLines = Math.max(1, Math.floor((height - 2 * m) / leading));
+  if (lines.length > maxLines) {          // page full: clear and continue
+    typePageStart = Math.floor(typeShown);
+    typeWrapKey = '';
+    pop();
+    return;
+  }
+
+  const right = CONFIG.typeCorner === 'tr' || CONFIG.typeCorner === 'br';
+  const bottom = CONFIG.typeCorner === 'bl' || CONFIG.typeCorner === 'br';
+  const col = color(CONFIG.textColor);
+  ctx.shadowBlur = CONFIG.glow; ctx.shadowColor = CONFIG.textColor;
+  fill(red(col), green(col), blue(col), 255);
+  textAlign(right ? RIGHT : LEFT, TOP);
+  const x = right ? width - m : m;
+
+  if (Math.floor(now / 500) % 2 === 0) {  // blinking caret on the live line
+    lines = lines.slice();
+    lines[lines.length - 1] += '▍';
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const y = bottom ? height - m - (lines.length - i) * leading : m + i * leading;
+    text(lines[i], x, y);
+  }
+  ctx.shadowBlur = 0;
   pop();
 }
 
@@ -1805,11 +1968,19 @@ function spawnCluster(phrase, sub) {
     return;
   }
 
+  if (CONFIG.liveLayout === 'typefill') {
+    typeTarget += (typeTarget ? ' ' : '') + (sub ? phrase + ' ' + sub : phrase);
+    return;
+  }
+
   const m = CONFIG.margin;
+  let sx = random(m, width - m);
+  if (CONFIG.motionField === 'ltr') sx = -random(40, 220);
+  if (CONFIG.motionField === 'rtl') sx = width + random(40, 220);
   ghosts.push({
     text: phrase,
     sub: sub || null,
-    x: random(m, width - m),
+    x: sx,
     y: random(m, height - m),
     vx: random(-1, 1), vy: random(-1, 1) * 0.6 - 0.15,
     size: DEFAULTS.baseSize * random(1 - CONFIG.sizeVariation, 1 + CONFIG.sizeVariation),
@@ -2102,8 +2273,10 @@ function setStatus(live, msg) {
    ============================================================ */
 const BINDINGS = [
   { id: 'langSel',      key: 'language',           kind: 'select', after: () => { updateTranslateVisibility(); if (CONFIG.engine === 'webspeech') startEngine(); } },
-  { id: 'modeSel',      key: 'liveLayout',         kind: 'select', after: updatePanelVisibility },
+  { id: 'modeSel',      key: 'liveLayout',         kind: 'select', after: () => { if (CONFIG.liveLayout === 'typefill') resetTypeFill(); updatePanelVisibility(); } },
   { id: 'importSel',    key: 'importMode',         kind: 'select', after: () => { if (scriptDoc) rebuildCues(); } },
+  { id: 'typeCornerSel', key: 'typeCorner',        kind: 'select' },
+  { id: 'typeSpeedSel', key: 'typeSpeed',          kind: 'range', valId: 'typeSpeedVal' },
   { id: 'animPaceSel',  key: 'animPace',           kind: 'range', valId: 'animPaceVal' },
   { id: 'animLoopSel',  key: 'animLoop',           kind: 'select' },
   { id: 'cueTransSel',  key: 'cueTranslate',       kind: 'select', after: () => { updateCueTransVisibility(); prefetchTranslations(); boundsCacheKey = ''; } },
@@ -2179,7 +2352,9 @@ function tickAnim(now) {
     if (/[,،、]$/.test(w)) break;
   }
   if (chunk.length) {
-    spawnCluster(chunk.join(' '), null);
+    // the comma is a break signal, not part of the word — strip it from
+    // display (trailing only, so 1,000 and other in-word commas survive)
+    spawnCluster(chunk.map(w => w.replace(/[,،、]+$/, '')).join(' '), null);
     animPos += chunk.length;
     animNextAt = now + (chunk.length / CONFIG.animPace) * 1000;
     updateAnimInfo();
@@ -2218,6 +2393,7 @@ $('animPlayBtn').addEventListener('click', () => {
 $('animRestartBtn').addEventListener('click', () => {
   readAnimText();
   animPos = 0; ghosts = []; subtitleRows = []; particles = [];
+  resetTypeFill();
   drawBackground(true);
   animPlaying = animWords.length > 0;
   animNextAt = 0;
@@ -2270,6 +2446,8 @@ function updatePanelVisibility() {
   const live = m === 'live', anim = m === 'anim', manual = m === 'manual';
   const spawnish = live || anim;
   const floating = spawnish && CONFIG.liveLayout === 'floating';
+  const typefill = spawnish && CONFIG.liveLayout === 'typefill';
+  $('typefillWrap').classList.toggle('hidden', !typefill);
   document.querySelectorAll('.sec-live').forEach(el => el.classList.toggle('hidden', !live));
   document.querySelectorAll('.sec-anim').forEach(el => el.classList.toggle('hidden', !anim));
   document.querySelectorAll('.sec-manual').forEach(el => el.classList.toggle('hidden', !manual));
@@ -2288,7 +2466,9 @@ function updatePanelVisibility() {
       : 'you trigger prepared cues by hand — surtitle style.';
   $('modeHint').textContent = CONFIG.liveLayout === 'floating'
     ? 'words drift as apparitions across the canvas.'
-    : 'lines gather at the bottom of the screen.';
+    : CONFIG.liveLayout === 'typefill'
+      ? 'text types itself from the chosen corner, filling the screen page by page.'
+      : 'lines gather at the bottom of the screen.';
 }
 
 function setAppMode(m) {
